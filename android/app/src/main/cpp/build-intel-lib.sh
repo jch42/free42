@@ -1,7 +1,7 @@
 #!/bin/sh
 
-NDK="$HOME/Library/Android/sdk/ndk-bundle"
-export PATH="`/bin/pwd`/bin:$NDK/prebuilt/darwin-x86_64/bin:$NDK/toolchains/llvm/prebuilt/darwin-x86_64/bin:$PATH"
+NDK="/cygdrive/C/Users/jch/AppData/Local/Android/Sdk/ndk/19.2.5345600"
+export PATH="`/bin/pwd`/bin:$PATH"
 BUILT=0
 
 build_arch () {
@@ -14,8 +14,13 @@ build_arch () {
     fi
     rm -rf bin IntelRDFPMathLib20U1
     mkdir bin
-    echo "$ARCH_CC"' "$@"' > bin/gcc
-    echo "$ARCH_AR"' "$@"' > bin/ar
+    CC=$NDK/toolchains/llvm/prebuilt/windows-x86_64/bin/$ARCH_CC
+    ln -s $CC bin/gcc
+    ln -s $NDK/toolchains/llvm/prebuilt/windows-x86_64/bin/clang.exe bin/clang.exe
+    AR=$NDK/toolchains/llvm/prebuilt/windows-x86_64/bin/$ARCH_AR
+    ln -s $AR bin/ar
+#    echo "$ARCH_CC"' "$@"' > bin/gcc
+#    echo "$ARCH_AR"' "$@"' > bin/ar
     chmod +x bin/*
     if [ -f ../../../../../inteldecimal/IntelRDFPMathLib20U1.tar.gz ]
     then
