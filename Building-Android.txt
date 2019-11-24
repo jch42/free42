@@ -1,0 +1,17 @@
+Instruction to build Android version with Windows + Cygwin
+- Use Android Studio 3.4.2
+- Install NDK
+    libbid complies with ndk 19, but if error on fexcept definitions add the following in Sdk\ndk_bundle\toolchains\llvm\prebuilt\windows-x86_64\sysroot\usr\include\fenv.h :
+        #ifndef _FENV_H_
+        #define _FENV_H_
+        #endif
+- Install Cygwin :
+    Add patch and make
+    Add Cygwin Variable : CYGWIN=winsymlinks:nativestrict
+    Run Cygwin as an administrator to build libbid.a
+
+-> replace crlf -> lf in :
+    ./build-android.sh
+    ./android/app/src/main/cpp/link-files.sh
+    ./android/app/src/main/cpp/build-intel-lib.sh
+    ./android/gradlew
