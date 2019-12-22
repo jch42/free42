@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="Windows-1252"?>
 <VisualStudioProject
 	ProjectType="Visual C++"
-	Version="9.00"
+	Version="9,00"
 	Name="Free42Decimal"
 	ProjectGUID="{1757EC64-6C3D-413F-855B-32605476D747}"
 	RootNamespace="Free42Decimal"
@@ -209,6 +209,14 @@
 				>
 			</File>
 			<File
+				RelativePath=".\core_ebml.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\core_extensions.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\core_globals.cpp"
 				>
 			</File>
@@ -257,6 +265,38 @@
 				>
 			</File>
 			<File
+				RelativePath=".\hpil_base.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\hpil_common.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\hpil_controller.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\hpil_core.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\hpil_extended.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\hpil_mass.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\hpil_plotter.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\hpil_printer.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\keymap.cpp"
 				>
 			</File>
@@ -295,6 +335,10 @@
 						AdditionalOptions="/bigobj"
 					/>
 				</FileConfiguration>
+			</File>
+			<File
+				RelativePath=".\shell_extensions.cpp"
+				>
 			</File>
 			<File
 				RelativePath=".\shell_loadimage.cpp"
@@ -371,6 +415,14 @@
 				>
 			</File>
 			<File
+				RelativePath=".\core_ebml.h"
+				>
+			</File>
+			<File
+				RelativePath=".\core_extensions.h"
+				>
+			</File>
+			<File
 				RelativePath=".\core_globals.h"
 				>
 			</File>
@@ -419,7 +471,43 @@
 				>
 			</File>
 			<File
+				RelativePath=".\FastDelegate.h"
+				>
+			</File>
+			<File
 				RelativePath=".\free42.h"
+				>
+			</File>
+			<File
+				RelativePath=".\hpil_base.h"
+				>
+			</File>
+			<File
+				RelativePath=".\hpil_common.h"
+				>
+			</File>
+			<File
+				RelativePath=".\hpil_controller.h"
+				>
+			</File>
+			<File
+				RelativePath=".\hpil_core.h"
+				>
+			</File>
+			<File
+				RelativePath=".\hpil_extended.h"
+				>
+			</File>
+			<File
+				RelativePath=".\hpil_mass.h"
+				>
+			</File>
+			<File
+				RelativePath=".\hpil_plotter.h"
+				>
+			</File>
+			<File
+				RelativePath=".\hpil_printer.h"
 				>
 			</File>
 			<File
@@ -432,6 +520,10 @@
 			</File>
 			<File
 				RelativePath=".\shell.h"
+				>
+			</File>
+			<File
+				RelativePath=".\shell_extensions.h"
 				>
 			</File>
 			<File

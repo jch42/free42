@@ -74,16 +74,16 @@ BEGIN
     END
 END
 
-IDR_STATES_MORE MENU DISCARDABLE
+IDR_STATES_KORE MENU DISCARDABLE
 BEGIN
-    POPUP "More"
+    POPUP "Kore"
     BEGIN
-        MENUITEM "New"            IDM_MORE_NEW
-        MENUITEM "Duplicate"      IDM_MORE_DUPLICATE
-        MENUITEM "Rename"         IDM_MORE_RENAME
-        MENUITEM "Delete"         IDM_MORE_DELETE
-        MENUITEM "Import"         IDM_MORE_IMPORT
-        MENUITEM "Export"         IDM_MORE_EXPORT
+        MENUITEM "New",           IDM_MORE_NEW
+        MENUITEM "Duplicate",     IDM_MORE_DUPLICATE
+        MENUITEM "Rename",        IDM_MORE_RENAME
+        MENUITEM "Delete",        IDM_MORE_DELETE
+        MENUITEM "Import",        IDM_MORE_IMPORT
+        MENUITEM "Export",        IDM_MORE_EXPORT
     END
 END
 
@@ -333,17 +333,17 @@ END
 //
 // Sounds
 //
-IDR_TONE0_WAVE WAVE tone0.wav
-IDR_TONE1_WAVE WAVE tone1.wav
-IDR_TONE2_WAVE WAVE tone2.wav
-IDR_TONE3_WAVE WAVE tone3.wav
-IDR_TONE4_WAVE WAVE tone4.wav
-IDR_TONE5_WAVE WAVE tone5.wav
-IDR_TONE6_WAVE WAVE tone6.wav
-IDR_TONE7_WAVE WAVE tone7.wav
-IDR_TONE8_WAVE WAVE tone8.wav
-IDR_TONE9_WAVE WAVE tone9.wav
-IDR_SQUEAK_WAVE WAVE squeak.wav
+IDR_TONE0_WAVE WAVE     "tone0.wav"
+IDR_TONE1_WAVE WAVE     "tone1.wav"
+IDR_TONE2_WAVE WAVE     "tone2.wav"
+IDR_TONE3_WAVE WAVE     "tone3.wav"
+IDR_TONE4_WAVE WAVE     "tone4.wav"
+IDR_TONE5_WAVE WAVE     "tone5.wav"
+IDR_TONE6_WAVE WAVE     "tone6.wav"
+IDR_TONE7_WAVE WAVE     "tone7.wav"
+IDR_TONE8_WAVE WAVE     "tone8.wav"
+IDR_TONE9_WAVE WAVE     "tone9.wav"
+IDR_SQUEAK_WAVE WAVE    "squeak.wav"
 
 #endif    // English (U.S.) resources
 /////////////////////////////////////////////////////////////////////////////

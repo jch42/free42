@@ -188,7 +188,8 @@ uint8_t hold;
 					|| (arg() && (tads() || tacs() || spas() || dias() || aias() || tahs() || ters() || lacs() || cacs() || csbs()))
 					|| (aad() && (aaus() || cacs()));	// add cacs to hold aad when controler
 				if (echo && hold) {
-					shell_write_console("Echo / Hold conflicts !!!");
+					// debug
+					//shell_write_console("Echo / Hold conflicts !!!");
 				}
 				if (echo && !dtrs()) {
 					R_State = RITS;
@@ -300,7 +301,8 @@ uint8_t norepeat;
 					|| (nrd() && cacs());
 				// troubleshooting
 				if (repeat && norepeat) {
-					shell_write_console("Repeat conflicts !!!");
+					// debug
+					//shell_write_console("Repeat conflicts !!!");
 					/*Serial.print("Repeat : (doe() && (lacs() || nrws() || cacs()))");
 					Serial.println((doe() && (lacs() || nrws() || cacs())),DEC);
 					Serial.print("Repeat : (rdy() && !sot() && !aag() && !cacs() && !csbs())");

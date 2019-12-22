@@ -3714,7 +3714,9 @@ void hard_reset(int reason) {
     flags.f.f14 = 0;
     flags.f.trace_print = 0;
     flags.f.normal_print = 0;
-    flags.f.f17 = flags.f.f18 = flags.f.f19 = flags.f.f20 = 0;
+    flags.f.hpil_ina_err = 0;
+	flags.f.hpil_ina_eol = 0;
+	flags.f.f19 = flags.f.f20 = 0;
     flags.f.printer_enable = 0;
     flags.f.numeric_data_input = 0;
     flags.f.alpha_data_input = 0;
@@ -3726,7 +3728,8 @@ void hard_reset(int reason) {
     flags.f.thousands_separators = 1;
     flags.f.stack_lift_disable = 0;
     flags.f.dmy = 0;
-    flags.f.f32 = flags.f.f33 = 0;
+    flags.f.manual_IO_mode = 0;
+	flags.f.f33 = 0;
     flags.f.agraph_control1 = 0;
     flags.f.agraph_control0 = 0;
     flags.f.digits_bit3 = 0;

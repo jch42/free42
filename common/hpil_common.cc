@@ -173,7 +173,9 @@ bool persist_hpil(void) {
  * get back parts of hpil settings
  */
 bool unpersist_hpil(int ver) {
-	return shell_read_saved_state(&hpil_settings, sizeof(hpil_settings)) == sizeof(hpil_settings);
+//	return shell_read_saved_state(&hpil_settings, sizeof(hpil_settings)) == sizeof(hpil_settings);
+//  need to recover where this is saved...
+	return true;
 }
 
 /* hpil_checkup
@@ -203,7 +205,8 @@ int hpil_check() {
  */
 int hpil_worker(int interrupted) {
 	int err = ERR_INTERRUPTIBLE;
-	char s[100];
+	// debug...
+	//char s[100];
 
 	if (interrupted) {
         err = ERR_STOP;

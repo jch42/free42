@@ -1536,7 +1536,7 @@ static int hp42tofree42[] = {
     CMD_NULL  | 0x3000
 };
 
-static int hp42ext[] = {
+int hp42ext[] = {
     /* Flag values: 0 = string, 1 = IND string, 2 = suffix, 3 = special,
      * 4 = illegal */
     /* 80-8F */
@@ -1685,7 +1685,7 @@ static int hp42ext[] = {
 };
 
 
-static phloat parse_number_line(char *buf) {
+phloat parse_number_line(char *buf) {
     phloat res;
     if (buf[0] == 'E' || buf[0] == '-' && buf[1] == 'E') {
         char *buf2 = (char *) malloc(strlen(buf) + 2);
@@ -2373,7 +2373,7 @@ static int scan_number(const char *buf, int len, int pos) {
     return len;
 }
 
-static bool parse_phloat(const char *p, int len, phloat *res) {
+bool parse_phloat(const char *p, int len, phloat *res) {
     // We can't pass the string on to string2phloat() unchanged, because
     // that function is picky: it does not allow '+' signs, and it does
     // not allow the mantissa to be more than 34 or 16 digits long (including

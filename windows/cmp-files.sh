@@ -16,6 +16,10 @@ cmp core_commands7.cpp ../common/core_commands7.cc
 cmp core_commands7.h ../common/core_commands7.h
 cmp core_display.cpp ../common/core_display.cc
 cmp core_display.h ../common/core_display.h
+cmp core_ebml.cpp ../common/core_ebml.cc
+cmp core_ebml.h ../common/core_ebml.h
+cmp core_extensions.cpp ../common/core_extensions.cc
+cmp core_extensions.h ../common/core_extensions.h
 cmp core_globals.cpp ../common/core_globals.cc
 cmp core_globals.h ../common/core_globals.h
 cmp core_helpers.cpp ../common/core_helpers.cc
@@ -57,7 +61,9 @@ cmp hpil_printer.cpp ../common/hpil_printer.cc
 cmp hpil_printer.h ../common/hpil_printer.h
 cmp hpil_plotter.cpp ../common/hpil_plotter.cc
 cmp hpil_plotter.h ../common/hpil_plotter.h
+cmp hpil_utils.h ../common/hpil_utils.h
 cmp shell.h ../common/shell.h
+cmp shell_extensions.h ../common/shell_extensions.h
 cmp shell_loadimage.cpp ../common/shell_loadimage.cc
 cmp shell_loadimage.h ../common/shell_loadimage.h
 cmp shell_spool.cpp ../common/shell_spool.cc

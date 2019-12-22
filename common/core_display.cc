@@ -2853,3 +2853,27 @@ void do_prgm_menu_key(int keynum) {
         }
     }
 }
+
+/* 
+ *
+ */
+void scroll_display(int row, const char *s, int length) {
+	int v;
+	int y0, y1;
+	if (row <0 || row >=2) {
+		return;
+	}
+	y0 = row == 1 ? 136 : 0;
+	y1 = row == 1 ? 0 : 136;
+	clear_row(row == 1 ? 0 : 1);
+	for (v = y1; v < y1 + 136; v++) {
+		display[v] = display[y0];
+		y0++;
+	}
+    mark_dirty(0, 0, 16, 131);
+	clear_row(row);
+    draw_string(0, row, s, length);
+    flags.f.message = 1;
+    flags.f.two_line_message = 1;
+	flush_display();
+}

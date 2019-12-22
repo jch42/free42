@@ -23,12 +23,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "core_display.h"
+#include "core_extensions.h"
 #include "core_globals.h"
 #include "core_main.h"
 #include "core_variables.h"
 #include "hpil_common.h"
 #include "hpil_controller.h"
 #include "hpil_mass.h"
+
 
 #if defined (__ANDROID__)
 
@@ -1762,7 +1764,7 @@ static void hpil_readpRefreshBuf(void) {
 	// first run
 	if (s.pBlocks == 0) {
 		s.saved_prgm = current_prgm;
-		goto_dot_dot();
+		goto_dot_dot(true);
 		read_prgm = current_prgm;
 		s.index = 0;
 		crc = 0;

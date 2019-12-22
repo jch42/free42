@@ -221,4 +221,26 @@ void shell_message(const char *message);
  */
 void shell_log(const char *message);
 
+/* shell_check_connectivity()
+ *
+ * check loop i/o conectivity
+ */
+int shell_check_connectivity();
+ 
+/* shell_read_frame()
+ *
+ * Callback from hpil loop, check if frame received.
+ * Frame is rebuild from serial rx.
+ * Returns 1 when complete frame is received and clears tiemout4
+ */
+int shell_read_frame(int *rx);
+
+/* shell_write_frame()
+ *
+ * Callback from hpil loop, send new frame.
+ * is using com port, Frame is split according to ilser, full 8 bits improved format.
+ * return 1 - IP server unreachable...
+ */
+int shell_write_frame(int tx);
+
 #endif

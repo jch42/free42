@@ -15,6 +15,10 @@ copy core_commands7.cpp ..\common\core_commands7.cc
 copy core_commands7.h ..\common
 copy core_display.cpp ..\common\core_display.cc
 copy core_display.h ..\common
+copy core_ebml.cpp ..\common\core_ebml.cc
+copy core_ebml.h ..\common
+copy core_extensions.cpp ..\common\core_extensions.cc
+copy core_extensions.h ..\common
 copy core_globals.cpp ..\common\core_globals.cc
 copy core_globals.h ..\common
 copy core_helpers.cpp ..\common\core_helpers.cc
@@ -56,7 +60,9 @@ copy hpil_printer.cpp ..\common\hpil_printer.cc
 copy hpil_printer.h ..\common
 copy hpil_plotter.cpp ..\common\hpil_plotter.cc
 copy hpil_plotter.h ..\common
+copy hpil_utils.h ..\common
 copy shell.h ..\common
+copy shell_extensions.h ..\common
 copy shell_loadimage.cpp ..\common\shell_loadimage.cc
 copy shell_loadimage.h ..\common
 copy shell_spool.cpp ..\common\shell_spool.cc

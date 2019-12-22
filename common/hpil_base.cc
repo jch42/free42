@@ -20,7 +20,7 @@
 #include "core_helpers.h"
 #include "core_main.h"
 #include "core_variables.h"
-#include "hpil_base.com"
+#include "hpil_base.h"
 #include "hpil_controller.h"
 #include "hpil_common.h"
 #include "shell.h"
