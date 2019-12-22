@@ -1,6 +1,6 @@
 /*****************************************************************************
- * free42X -- an HP-IL emulation for free42
- * Copyright (C) 2014-2019 Jean-Christophe HESSEMANN
+ * Free42 -- an HP-42S calculator simulator
+ * Copyright (C) 2015-2019  Jean-Christophe Hessemann, core extensions
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License, version 2,

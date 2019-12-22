@@ -85,6 +85,11 @@ void core_init(int read_saved_state, int4 version, const char *state_file_name, 
     #else
         core_settings.enable_ext_fptest = false;
     #endif
+    #ifdef FREE42_HPIL
+        core_settings.enable_ext_hpil = true;
+    #else
+        core_settings.enable_ext_hpil = false;
+    #endif
     core_settings.enable_ext_time = true;
     core_settings.enable_ext_prog = true;
 

@@ -20,6 +20,8 @@
 
 #include "free42.h"
 
+LRESULT CALLBACK HpIlPrefs(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
+
 /* shell_check_connectivity()
  *
  * check loop i/o conectivity

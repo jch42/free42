@@ -32,6 +32,7 @@
 #include "core_display.h"
 #include "msg2string.h"
 #include "StatesWindow.h"
+#include "shell_extensions.h"
 #include "shell_main.h"
 
 #include "VERSION.rc"
@@ -574,6 +575,9 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT message, WPARAM wParam, LPAR
                 case IDM_PREFERENCES:
                     DialogBox(hInst, (LPCTSTR)IDD_PREFERENCES, hWnd, (DLGPROC)Preferences);
                     break;
+				case IDM_HPILPREFS:
+                    DialogBox(hInst, (LPCTSTR)IDD_HPILPREFS, hWnd, (DLGPROC)HpIlPrefs);
+					break;
                 case IDM_EXIT:
                     DestroyWindow(hWnd);
                     break;

@@ -17,13 +17,21 @@
 
 #include <winsock2.h>
 #include <ws2tcpip.h>
+
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <direct.h>
 #include <io.h>
+#include <shlobj.h>
 #include <stdio.h>
 
 #include "stdafx.h"
 #include "resource.h"
 
 #include "free42.h"
+#include "core_globals.h"
+#include "core_main.h"
+#include "hpil_common.h"
 #include "shell_extensions.h"
 
 #pragma comment(lib, "Ws2_32.lib")
@@ -59,15 +67,12 @@ WSADATA wsaData;
 SOCKET clientSocket, serverSocket[2];
 WSAEVENT serverEvent[2];
 
-static LRESULT CALLBACK HpIlPrefs(HWND, UINT, WPARAM, LPARAM);
-
 static void shell_init_port();
 static void shell_close_serial();
 static void shell_close_port();
 
 // Message handler for HP-IL preferences dialog.
-static LRESULT CALLBACK HpIlPrefs(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
-{
+LRESULT CALLBACK HpIlPrefs(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam) {
 HWND ctl;
 HKEY hkey;
 int dwindex = 0;
@@ -76,8 +81,7 @@ int hkeyNameLen;
 char hkeyValue[64];
 int hkeyValueLen;
 int err;
-    switch (message)
-    {
+    switch (message) {
         case WM_INITDIALOG: {
             // Initialize the dialog from the hpilPrefs structure
 			EnableWindow(GetDlgItem(hDlg, IDC_HPIL_INTERFACE), 0);
@@ -525,7 +529,7 @@ static void shell_init_port() {
 			modePIL_Box = state_extensions.pilBox;
 		}
 	}
-	hpil_init(modeEnabled, modeIP, modePIL_Box);
+	hpil_init(modeEnabled, modePIL_Box);
 }
 
 int shell_check_connectivity(void) {
@@ -565,7 +569,7 @@ int shell_read_frame(int *rx) {
 }
 
 static void shell_close_port() {
-	hpil_close(modeEnabled, modeIP, modePIL_Box);
+	hpil_close(modeEnabled, modePIL_Box);
 	shell_close_IP();
 	shell_close_serial();
 }

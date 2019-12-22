@@ -23,6 +23,7 @@
 #define IDD_STATES                              152
 #define IDD_STATE_NAME                          153
 #define IDD_HPILPREFS                           156
+#define IDR_STATES_MORE                         157
 #define IDC_MATRIX_SINGULARMATRIX               1000
 #define IDC_MATRIX_OUTOFRANGE                   1001
 #define IDC_AUTO_REPEAT                         1002
@@ -62,6 +63,7 @@
 #define IDM_MORE_IMPORT                         32787
 #define IDM_MORE_EXPORT                         32788
 #define IDC_HPIL_TCP_GRP                        40000
+#define IDM_HPILPREFS                           40000
 #define IDS_APP_TITLE_BIN                       40000
 #define IDC_HPIL_SERIAL_GRP                     40001
 #define IDS_APP_TITLE_DEC                       40001
