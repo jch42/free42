@@ -83,7 +83,7 @@ extern FILE *gfile;
 #define ERR_BAD_CRC				   48
 #define ERR_NO_PRINTER			   49
 #define ERR_PRINTER_ERR			   50
-#define ERR_PLOTTER_INIT		   51	
+#define ERR_PLOTTER_INIT		   51
 #define ERR_NO_PLOTTER			   52
 #define ERR_PLOTTER_ERR			   53
 #define ERR_PLOTTER_DATA_ERR	   54
