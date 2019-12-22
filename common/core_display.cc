@@ -1484,6 +1484,7 @@ static extension_struct extensions[] = {
     { CMD_ADATE,   CMD_SWPT,    &core_settings.enable_ext_time     },
     { CMD_FPTEST,  CMD_FPTEST,  &core_settings.enable_ext_fptest   },
     { CMD_LSTO,    CMD_BRESET,  &core_settings.enable_ext_prog     },
+    { CMD_IFC,     CMD_PRCL,    &core_settings.enable_ext_hpil      },
     { CMD_NULL,    CMD_NULL,    NULL                               }
 };
 
@@ -1499,6 +1500,7 @@ static int ext_fcn_cat[] = {
     CMD_LSTO, -1, CMD_WSIZE_T,
     CMD_ACCEL, CMD_LOCAT, CMD_HEADING,
     CMD_FPTEST,
+	CMD_IFC, -1, CMD_PRCL,
     CMD_NULL
 };
 
@@ -2364,6 +2366,7 @@ int command2buf(char *buf, int len, int cmd, const arg_struct *arg) {
             || !core_settings.enable_ext_time && cmd >= CMD_ADATE && cmd <= CMD_SWPT
             || !core_settings.enable_ext_fptest && cmd == CMD_FPTEST
             || !core_settings.enable_ext_prog && cmd >= CMD_LSTO && cmd <= CMD_YMD
+			|| !core_settings.enable_ext_hpil && cmd >= CMD_IFC && cmd <= CMD_PRCL
             || (cmdlist(cmd)->hp42s_code & 0xfffff800) == 0x0000a000 && (cmdlist(cmd)->flags & FLAG_HIDDEN) != 0) {
         xrom_arg = cmdlist(cmd)->hp42s_code;
         cmd = CMD_XROM;

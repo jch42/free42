@@ -3872,7 +3872,8 @@ int find_builtin(const char *name, int namelen, bool strict) {
         if (i == CMD_HEADING && !core_settings.enable_ext_heading) i++;
         if (i == CMD_ADATE && !core_settings.enable_ext_time) i += 34;
         if (i == CMD_FPTEST && !core_settings.enable_ext_fptest) i++;
-        if (i == CMD_SST_UP && !core_settings.enable_ext_prog) i += 2;
+        if (i == CMD_LSTO && !core_settings.enable_ext_prog) i += 9;
+		if (i == CMD_IFC && !core_settings.enable_ext_hpil) i+= 80;
         if (i == CMD_SENTINEL)
             break;
         if ((cmdlist(i)->flags & FLAG_HIDDEN) != 0)

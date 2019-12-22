@@ -353,7 +353,7 @@
 /* Underhill's COPAN extensions (Obsolete) */
 #define CMD_OPENF       315
 #define CMD_CLOSEF      316
-#define CMD_READP       317
+#define CMD_READD       317
 #define CMD_WRITEP      318
 #define CMD_GETXY       319
 #define CMD_PUTXY       320
@@ -419,7 +419,92 @@
 #define CMD_BWRAP       375
 #define CMD_BRESET      376
 
-#define CMD_SENTINEL    377
+/* hp-il extensions */
+#define CMD_IFC			377
+#define CMD_NLOOP   	378
+#define CMD_SELECT		379
+#define CMD_RCLSEL		380
+#define CMD_PRTSEL		381
+#define CMD_DSKSEL		382
+#define CMD_AUTOIO		383
+#define CMS_MANIO		384
+#define CMD_STAT		385
+#define CMD_ID			386
+#define CMD_AID			387
+#define CMD_BLDSPEC		388			// only for plotter module compatibility, check < 128
+/* hp-il mass storage operations */
+#define CMD_CREATE		389
+#define CMD_DIR			390
+#define CMD_NEWM		391
+#define CMD_PURGE	    392
+#define CMD_READP		393			// yep, readp freed from Copan extensions
+#define CMD_READR		394
+#define CMD_RENAME		395
+#define CMD_SEC			396
+#define CMD_UNSEC		397
+#define CMD_WRTP		398
+#define CMD_WRTR		399
+#define CMD_ZERO		400
+/* hp-il extended io */
+#define CMD_ANUMDEL		401
+#define CMD_CLRDEV		402
+#define CMD_CLRLOOP		403
+#define CMD_INAC		404
+#define CMD_INACL		405
+#define CMD_INAE		406
+#define CMD_INAN		407
+#define CMD_INXB		408
+#define CMD_INACCL		409
+#define CMD_OUTAC		410
+#define CMD_OUTACL		411
+#define CMD_OUTAE		412
+#define CMD_OUTAN		413
+#define CMD_OUTXB		414
+/* hp-il plotter module */
+#define CMD_CLIPUU		415
+#define CMD_CSIZE		416
+#define CMD_CSIZEO		417
+#define CMS_DGTIZE		418
+#define CMD_DRAW		419
+#define CMD_FRAME		420
+#define CMD_GCLEAR		421
+#define CMD_IDRAW		422
+#define CMD_IMOVE		423
+#define CMD_IPLOT		424
+#define CMD_LABEL		425
+#define CMD_LDIR		426
+#define CMD_LIMIT		427
+#define CMD_LOCATD		428
+#define CMD_LOCATE		429
+#define CMD_LORG		430
+#define CMD_LTYPE		431
+#define CMD_LTYPEO		432
+#define CMD_LXAXIS		433
+#define CMD_LYAXIS		434
+#define CMD_MOVE		435
+#define CMD_PEN			436
+#define CMD_PENDN		437
+#define CMD_PENUP		438
+#define CMD_PINIT		439
+#define CMD_PLOT		440
+#define CMD_PLREGX		441
+#define CMD_RATIO		442
+#define CMD_RPLOT		443
+#define CMD_SCALE		444
+#define CMD_SETGU		445
+#define CMD_SETUU		446
+#define CMD_TICLEN		447
+#define CMD_UNCLIP		448
+#define CMD_WHERE		449
+#define CMD_XAXIS		450
+#define CMD_XAXISO		451
+#define CMD_YAXIS		452
+#define CMD_YAXISO		453
+#define CMD_PCLBUF		454
+#define CMD_PDIR		455
+#define CMD_PRCL		456
+
+#define CMD_SENTINEL    457
 
 
 /* command_spec.argtype */
