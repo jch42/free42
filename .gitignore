@@ -238,6 +238,9 @@
 /windows/core_commands7.h
 /windows/core_display.cpp
 /windows/core_display.h
+/windows/core_ebml.cpp
+/windows/core_ebml.h
+/windows/core_extensions.h
 /windows/core_globals.cpp
 /windows/core_globals.h
 /windows/core_helpers.cpp
@@ -282,6 +285,7 @@
 /windows/hpil_printer.h
 /windows/keymap2cpp.cpp
 /windows/shell.h
+/windows/shell_extensions.h
 /windows/shell_loadimage.cpp
 /windows/shell_loadimage.h
 /windows/shell_spool.cpp
