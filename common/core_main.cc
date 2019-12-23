@@ -825,6 +825,8 @@ static void export_hp42s(int index) {
     do {
         get_next_command(&pc, &cmd, &arg, 0);
         hp42s_code = cmdlist(cmd)->hp42s_code;
+		// remove higher nibble
+		hp42s_code &= 0x0ffffff;	
         code_flags = hp42s_code >> 24;
         code_name = hp42s_code >> 16;
         code_std_1 = hp42s_code >> 8;
@@ -1096,6 +1098,8 @@ int4 core_program_size(int prgm_index) {
     do {
         get_next_command(&pc, &cmd, &arg, 0);
         hp42s_code = cmdlist(cmd)->hp42s_code;
+		// remove higher nibble
+		hp42s_code &= 0x0ffffff;	
         code_flags = hp42s_code >> 24;
         //code_name = hp42s_code >> 16;
         code_std_1 = hp42s_code >> 8;
@@ -1879,7 +1883,8 @@ void core_import_programs(int num_progs, const char *raw_file_name) {
                     goto done;
                 code = (((unsigned int) byte1) << 8) | byte2;
                 for (i = 0; i < CMD_SENTINEL; i++)
-                    if (cmdlist(i)->hp42s_code == code) {
+					// mask higher nibble
+                    if ((cmdlist(i)->hp42s_code & 0x0fffffff) == code) {
                         if ((cmdlist(i)->flags & FLAG_HIDDEN) != 0)
                             break;
                         cmd = i;

@@ -61,7 +61,6 @@ cmp hpil_printer.cpp ../common/hpil_printer.cc
 cmp hpil_printer.h ../common/hpil_printer.h
 cmp hpil_plotter.cpp ../common/hpil_plotter.cc
 cmp hpil_plotter.h ../common/hpil_plotter.h
-cmp hpil_utils.h ../common/hpil_utils.h
 cmp shell.h ../common/shell.h
 cmp shell_extensions.h ../common/shell_extensions.h
 cmp shell_loadimage.cpp ../common/shell_loadimage.cc

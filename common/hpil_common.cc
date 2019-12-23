@@ -17,6 +17,8 @@
 
 #include <stdio.h>
 
+#include "stdafx.h"
+
 #include "core_display.h"
 #include "core_ebml.h"
 #include "core_globals.h"
@@ -26,6 +28,7 @@
 #include "hpil_controller.h"
 #include "hpil_plotter.h"
 #include "shell.h"
+#include "shell_extensions.h"
 #include "string.h"
 
 HPIL_Controller hpil_core;

@@ -60,7 +60,6 @@ copy hpil_printer.cpp ..\common\hpil_printer.cc
 copy hpil_printer.h ..\common
 copy hpil_plotter.cpp ..\common\hpil_plotter.cc
 copy hpil_plotter.h ..\common
-copy hpil_utils.h ..\common
 copy shell.h ..\common
 copy shell_extensions.h ..\common
 copy shell_loadimage.cpp ..\common\shell_loadimage.cc
