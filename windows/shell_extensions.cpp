@@ -445,6 +445,7 @@ static int shell_init_IP() {
 	struct addrinfo *result = NULL,
 					hints;
 	char optVal = 1;
+	int err;
 
 	// WinSock initialization
 	if (WSAStartup(MAKEWORD(2,2), &wsaData)) {
@@ -467,7 +468,9 @@ static int shell_init_IP() {
 		WSACleanup();
 		return 1;
 	}
-	if (bind(serverSocket[0], result->ai_addr, (int)result->ai_addrlen)) {
+	err = bind(serverSocket[0], result->ai_addr, (int)result->ai_addrlen);
+	if (err) {
+		err = WSAGetLastError();
 		closesocket(serverSocket[0]);
 		freeaddrinfo(result);
 		WSACleanup();
@@ -709,6 +712,7 @@ static void shell_close_serial() {
 static void shell_init_port() {
 	modeEnabled = false;
 	modePIL_Box = false;
+	modeIP = false;
 
 	if (!strcmp(state_extensions.comPort," Disabled")) {
 	}
@@ -716,6 +720,7 @@ static void shell_init_port() {
 		shell_close_IP();
 		if (!shell_init_IP()) {
 			modeEnabled = true;
+			modeIP = true;
 		}
 	}
 	else {

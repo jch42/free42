@@ -1096,7 +1096,7 @@ void tb_print_current_program(textbuf *tb) {
 void display_prgm_line(int row, int line_offset) {
     int4 tmppc = pc;
     int4 tmpline = pc2line(pc);
-    int cmd;
+    int cmd = 0;
     arg_struct arg;
     char buf[44];
     int bufptr;
