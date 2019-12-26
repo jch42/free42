@@ -2369,8 +2369,9 @@ int command2buf(char *buf, int len, int cmd, const arg_struct *arg) {
             || !core_settings.enable_ext_fptest && cmd == CMD_FPTEST
             || !core_settings.enable_ext_prog && cmd >= CMD_LSTO && cmd <= CMD_YMD
 			|| !core_settings.enable_ext_hpil && cmd >= CMD_IFC && cmd <= CMD_PRCL
-            || (cmdlist(cmd)->hp42s_code & 0xfffff800) == 0x0000a000 && (cmdlist(cmd)->flags & FLAG_HIDDEN) != 0) {
+            || (cmdlist(cmd)->hp42s_code & 0x0ffff800) == 0x0000a000 && (cmdlist(cmd)->flags & FLAG_HIDDEN) != 0) {
         xrom_arg = cmdlist(cmd)->hp42s_code;
+		xrom_arg &= 0x0fffffff;
         cmd = CMD_XROM;
     } else if (cmd == CMD_XROM)
         xrom_arg = arg->val.num;
