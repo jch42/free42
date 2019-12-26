@@ -337,17 +337,17 @@ int l, version;
 		}
 		state_extensions.outIP = el.elLen;
 		// target port
-		el.elId = EL_hpil_inTcpPort;
-		if (ebmlGetEl(&el) != 1) {
-            goto openExtensionError;
-		}
-		state_extensions.inTcpPort = el.elLen;
-		// listening port
 		el.elId = EL_hpil_outTcpPort;
 		if (ebmlGetEl(&el) != 1) {
             goto openExtensionError;
 		}
 		state_extensions.outTcpPort = el.elLen;
+		// listening port
+		el.elId = EL_hpil_inTcpPort;
+		if (ebmlGetEl(&el) != 1) {
+            goto openExtensionError;
+		}
+		state_extensions.inTcpPort = el.elLen;
 		// speeds
 		el.elId = EL_hpil_highSpeed;
 		if (!ebmlReadElBool(&el, &state_extensions.highSpeed)) {
@@ -387,8 +387,8 @@ int l, version;
 		if (!ebmlReadElInt(&el, &hpil_settings.dskAid)) {
             goto openExtensionError;
 		}
+		goto openExtensionDone;
 	}
-	goto openExtensionDone;
   openExtensionError:
 	// (re)init anything 
 	state_extensions.comPort[0] = 0;
@@ -403,6 +403,7 @@ int l, version;
 	hpil_settings.dskAid = 0;
 	hpil_settings.plotter = 0;
   openExtensionDone:
+	fclose(EbmlStateFile);
 	shell_init_port();
 }
 
@@ -432,6 +433,7 @@ void close_extension(char* stateExtFilename) {
 		ebmlWriteEndOfDocument();
 		ebmlWriteEndOfDocument();
     }
+	fclose(EbmlStateFile);
 	shell_close_port();
  }
 

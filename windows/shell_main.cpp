@@ -416,9 +416,9 @@ static BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
     if (hMainWnd == NULL)
         return FALSE;
 
-	open_extension(extensionfilename);
-
     core_init(init_mode, version, core_state_file_name, core_state_file_offset);
+
+	open_extension(extensionfilename);
 
     if (state.mainPlacementValid) {
         // Fix the size, in case the saved settings are not appropriate

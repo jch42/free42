@@ -754,7 +754,7 @@ unsigned char buf[64];
         return false;
     }
     sz += j;
-    j = ebmlWriteVInt(EBMLFree42ExtensionsReadVersion, _EBMLFree42ExtensionsReadVersion, &buf[0]);
+    j = ebmlWriteVInt(EBMLFree42ExtensionsReadVersion, _EBMLFree42ExtensionsReadVersion, &buf[sz]);
     if (j == 0) {
         return false;
     }
@@ -774,7 +774,7 @@ int j, sz;
         return false;
     }
     sz += j;
-    j = ebmlWriteVInt(EBMLFree42ExtensionsHpilReadVersion, _EBMLFree42ExtensionsHpilReadVersion, &buf[0]);
+    j = ebmlWriteVInt(EBMLFree42ExtensionsHpilReadVersion, _EBMLFree42ExtensionsHpilReadVersion, &buf[sz]);
     if (j == 0) {
         return false;
     }
