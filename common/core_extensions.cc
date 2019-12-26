@@ -407,30 +407,34 @@ void core_42ToFree42_string (unsigned char *buf, int pt, int len, arg_struct *ar
  *
  * W will result to CMS_NULL, cf remark about len byte not being 0xfn
  */
-void core_42ToFree42_alphaGto (unsigned char *buf, int *pt) {
-	int cmd;
-	arg_struct arg;
-	switch 	(buf[*pt]) {
-		case 0x1d :
-			cmd = CMD_GTO;
-			arg.type = ARGTYPE_STR;
-			break;
-		case 0x1e :
-			cmd = CMD_XEQ;
-			arg.type = ARGTYPE_STR;
-			break;
-		case 0x1f :
-			// W, treat as null but consume string
-			cmd = CMD_NONE;
-			arg.type = ARGTYPE_NONE;
-			break;
-	}
-	core_42ToFree42_string (buf, (*pt) + 2, buf[(*pt)+1] & 0x0f, &arg);
-	// should not append !!!
+int core_42ToFree42_alphaGto (unsigned char *buf, int *pt, int l) {
+    int cmd;
+    arg_struct arg;
+    if ((l < 3) || (l < ((buf[(*pt) + 1] & 0xf) + 1))) {
+        return 1;
+    }
+    switch  (buf[*pt]) {
+        case 0x1d :
+            cmd = CMD_GTO;
+            arg.type = ARGTYPE_STR;
+            break;
+        case 0x1e :
+            cmd = CMD_XEQ;
+            arg.type = ARGTYPE_STR;
+            break;
+        case 0x1f :
+            // W, treat as null but consume string
+            cmd = CMD_NONE;
+            arg.type = ARGTYPE_NONE;
+            break;
+    }
+    core_42ToFree42_string (buf, (*pt) + 2, buf[(*pt)+1] & 0x0f, &arg);
+    // should not append !!!
     // 'Extend Your HP41' section 15.7 says that if the high nybble of 
     //   the second byte is not f, then the pc is only incremented by 2 
-	(*pt) += ((buf[(*pt) + 1] >> 4) == 0xf) ? (buf[(*pt) + 1] & 0xf) + 2 : 2;
-	store_command_after(&pc, cmd, &arg);
+    (*pt) += ((buf[(*pt) + 1] >> 4) == 0xf) ? (buf[(*pt) + 1] & 0xf) + 2 : 2;
+    store_command_after(&pc, cmd, &arg);
+    return 0;
 }
 
 /* builds up digits
@@ -438,37 +442,41 @@ void core_42ToFree42_alphaGto (unsigned char *buf, int *pt) {
  * take care of len to avoid infinite loop
  */
 #define MAXDIGITSBUF 50
-void core_42ToFree42_number (unsigned char *buf, int *pt, int l) {
-	int cmd;
-	arg_struct arg;
-	int i = 0;
-	int s;
-	char DigitsBuf[MAXDIGITSBUF];
-	cmd = CMD_NUMBER;
-	arg.type = ARGTYPE_DOUBLE;
-	do  {
-		switch (buf[*pt]) {
-			case 0x1a :
-				DigitsBuf[i++] = '.';
-				break;
-			case 0x1b :
-				DigitsBuf[i++] = 'E';
-				break;
-			case 0x1c :
-				DigitsBuf[i++] = '-';
-				break;
-			default :
-				DigitsBuf[i++] = buf[*pt] + 0x20;
-		}
-		(*pt)++;
-	} while ((buf[*pt] >= 0x10) && (buf[*pt] <= 0x1C) && (i < l) && (i <MAXDIGITSBUF));
-	if (buf[*pt] == 0x00) {
-		// ignore 0x00 digit separator
-		(*pt)++;
-	}
-	DigitsBuf[i++] = 0;
-    arg.val_d = parse_number_line(DigitsBuf);
-	store_command_after(&pc, cmd, &arg);
+int core_42ToFree42_number (unsigned char *buf, int *pt, int l) {
+    int cmd;
+    arg_struct arg;
+    int i = 0;
+    char DigitsBuf[MAXDIGITSBUF];
+    cmd = CMD_NUMBER;
+    arg.type = ARGTYPE_DOUBLE;
+    do  {
+        switch (buf[*pt]) {
+            case 0x1a :
+                DigitsBuf[i++] = '.';
+                break;
+            case 0x1b :
+                DigitsBuf[i++] = 'E';
+                break;
+            case 0x1c :
+                DigitsBuf[i++] = '-';
+                break;
+            default :
+                DigitsBuf[i++] = buf[*pt] + 0x20;
+        }
+        (*pt)++;
+    } while ((buf[*pt] >= 0x10) && (buf[*pt] <= 0x1C) && (i < l) && (i <MAXDIGITSBUF));
+    if (i < l) {
+        // buffer not exhausted
+        if (buf[*pt] == 0x00) {
+            // ignore 0x00 digit separator
+            (*pt)++;
+        }
+        DigitsBuf[i++] = 0;
+        arg.val_d = parse_number_line(DigitsBuf);
+        store_command_after(&pc, cmd, &arg);
+        return 0;
+    }
+    return 1;
 }
 
 /* decode suffix
@@ -476,77 +484,86 @@ void core_42ToFree42_number (unsigned char *buf, int *pt, int l) {
  *
  */
 void core_42ToFree42_suffix (unsigned char suffix, arg_struct *arg) {
-	bool ind;
-	ind = (suffix & 0x80) ? true : false;
-	suffix &= 0x7f;
-	if (!ind && (suffix >= 0x66) && (suffix <= 0x6f)) {
-		arg->type = ARGTYPE_LCLBL;
+    bool ind;
+    ind = (suffix & 0x80) ? true : false;
+    suffix &= 0x7f;
+    if (!ind && (suffix >= 0x66) && (suffix <= 0x6f)) {
+        arg->type = ARGTYPE_LCLBL;
         arg->val.lclbl = 'A' + (suffix - 0x66);
-	}
-	else if (!ind && suffix >= 0x7b) {
-		arg->type = ARGTYPE_LCLBL;
-		arg->val.lclbl = 'a' + (suffix - 0x7b);
-	}
-	else if (suffix >= 0x70 && suffix <= 0x74) {
-		arg->type = ind ? ARGTYPE_IND_STK : ARGTYPE_STK;
-		switch (suffix) {
-			case 0x70 :
-				arg->val.stk = 'T';
-				break;
+    }
+    else if (!ind && suffix >= 0x7b) {
+        arg->type = ARGTYPE_LCLBL;
+        arg->val.lclbl = 'a' + (suffix - 0x7b);
+    }
+    else if (suffix >= 0x70 && suffix <= 0x74) {
+        arg->type = ind ? ARGTYPE_IND_STK : ARGTYPE_STK;
+        switch (suffix) {
+            case 0x70 :
+                arg->val.stk = 'T';
+                break;
             case 0x71 :
-				arg->val.stk = 'Z';
-				break;
+                arg->val.stk = 'Z';
+                break;
             case 0x72 :
-				arg->val.stk = 'Y';
-				break;
+                arg->val.stk = 'Y';
+                break;
             case 0x73 :
-				arg->val.stk = 'X';
-				break;
+                arg->val.stk = 'X';
+                break;
             case 0x74 :
-				arg->val.stk = 'L';
-				break;
-		}
-	}
-	else {
-		arg->type = ind ? ARGTYPE_IND_NUM : ARGTYPE_NUM;
-		arg->val.num = suffix;
-	}
+                arg->val.stk = 'L';
+                break;
+        }
+    }
+    else {
+        arg->type = ind ? ARGTYPE_IND_NUM : ARGTYPE_NUM;
+        arg->val.num = suffix;
+    }
 }
-
 /* Decode xrom (two bytes) instructions
  *
  * linear search in cmd array
  */
 void core_42toFree42_xrom (unsigned char *buf, int *pt, int *cmd) {
-	int i;
-	uint4 inst;
-	i = 0;
-	inst = (uint4)((buf[*pt] << 8) + buf[(*pt)+1]);
-	do {
-		if ((inst == ((cmdlist(i)->hp42s_code) & 0xffff)) && ((cmdlist(i)->flags & FLAG_HIDDEN) == 0)) {
-			*cmd = i;
-			break;
-		}
-		i++;
-	} while (i < CMD_SENTINEL);
+    int i;
+    uint4 inst;
+    i = 0;
+    inst = (uint4)((buf[*pt] << 8) + buf[(*pt)+1]);
+    do {
+        if ((inst == ((cmdlist(i)->hp42s_code) & 0xffff)) && ((cmdlist(i)->flags & FLAG_HIDDEN) == 0)) {
+            *cmd = i;
+            break;
+        }
+        i++;
+    } while (i < CMD_SENTINEL);
 }
 
 /* Global labels / end
  *
  */
-void core_42ToFree42_globalEnd (unsigned char *buf, int *pt) {
-	int cmd;
-	arg_struct arg;
-	if (buf[(*pt) + 2] & 0x80) {
-		cmd = CMD_LBL;
-		arg.type = ARGTYPE_STR;
-		core_42ToFree42_string (buf, (*pt)+4, (buf[(*pt)+2] & 0x0f) - 1, &arg);
-		store_command_after(&pc, cmd, &arg);
-	}
-	else {
-		goto_dot_dot(false);
-	}
-	(*pt) += (buf[(*pt) + 2] & 0x80) ? (buf[(*pt) + 2] & 0x0f) + 3 : 3;
+int core_42ToFree42_globalEnd (unsigned char *buf, int *pt, int l) {
+    int cmd;
+    arg_struct arg;
+    if (l < 3) {
+        return 1;
+    }
+    if (buf[(*pt) + 2] & 0x80) {
+        if (l < ((buf[(*pt) + 1] & 0xf) + 2)) {
+            return 1;
+        }
+        cmd = CMD_LBL;
+        arg.type = ARGTYPE_STR;
+        core_42ToFree42_string (buf, (*pt)+4, (buf[(*pt)+2] & 0x0f) - 1, &arg);
+        store_command_after(&pc, cmd, &arg);
+    }
+    else {
+        cmd = CMD_END;
+        arg.type = ARGTYPE_NONE;
+        store_command_after(&pc, cmd, &arg);
+        goto_dot_dot(false);
+    }
+    (*pt) += (buf[(*pt) + 2] & 0x80) ? (buf[(*pt) + 2] & 0x0f) + 3 : 3;
+    return 0;
 }
 
 /* Text0, synthetic only
@@ -554,161 +571,174 @@ void core_42ToFree42_globalEnd (unsigned char *buf, int *pt) {
  * special case
  */
 void core_42ToFree42_string0 (unsigned char *buf, int *pt) {
-	int cmd;
-	arg_struct arg;
-	cmd = CMD_STRING;
+    int cmd;
+    arg_struct arg;
+    cmd = CMD_STRING;
     arg.type = ARGTYPE_STR;
     arg.length = 1;
     arg.val.text[0] = 127;
-	(*pt)++;
-	store_command_after(&pc, cmd, &arg);
+    (*pt)++;
+    store_command_after(&pc, cmd, &arg);
 }
 
 /* Text1, mixed text and hp42-s fix/sci/eng
  *
  */
 void core_42ToFree42_string1 (unsigned char *buf, int *pt) {
-	int cmd;
-	arg_struct arg;
+    int cmd;
+    arg_struct arg;
     arg.type = ARGTYPE_NUM;
-	switch (buf[(*pt)+1]) {
-		case 0xd5 :
-			cmd = CMD_FIX;
-			arg.val.num = 10;
-			break;
-		case 0xd6 :
-			cmd = CMD_SCI;
-			arg.val.num = 10;
-			break;
-		case 0xd7 :
-			cmd = CMD_ENG; 
-			arg.val.num = 10; 
-			break;
-		case 0xe5 :
-			cmd = CMD_FIX;
-			arg.val.num = 11;
-			break;
-		case 0xe6:
-			cmd = CMD_SCI;
-			arg.val.num = 11;
-			break;
-		case 0xe7:
-			cmd = CMD_ENG;
-			arg.val.num = 11;
-			break;
-		default :
-			cmd = CMD_STRING;
-			arg.type = ARGTYPE_STR;
-			core_42ToFree42_string (buf, (*pt) + 1, buf[*pt] & 0x0f, &arg);
-	}
-	(*pt) += (buf[*pt] & 0x0f) + 1;
-	store_command_after(&pc, cmd, &arg);
+    switch (buf[(*pt)+1]) {
+        case 0xd5 :
+            cmd = CMD_FIX;
+            arg.val.num = 10;
+            break;
+        case 0xd6 :
+            cmd = CMD_SCI;
+            arg.val.num = 10;
+            break;
+        case 0xd7 :
+            cmd = CMD_ENG; 
+            arg.val.num = 10; 
+            break;
+        case 0xe5 :
+            cmd = CMD_FIX;
+            arg.val.num = 11;
+            break;
+        case 0xe6:
+            cmd = CMD_SCI;
+            arg.val.num = 11;
+            break;
+        case 0xe7:
+            cmd = CMD_ENG;
+            arg.val.num = 11;
+            break;
+        default :
+            cmd = CMD_STRING;
+            arg.type = ARGTYPE_STR;
+            core_42ToFree42_string (buf, (*pt) + 1, buf[*pt] & 0x0f, &arg);
+    }
+    (*pt) += (buf[*pt] & 0x0f) + 1;
+    store_command_after(&pc, cmd, &arg);
 }
 
 /* Textn, n > 2 & second byte < 0x80
  *
  */
 void core_42ToFree42_stringn (unsigned char *buf, int *pt) {
-	int cmd;
-	arg_struct arg;
-	cmd = CMD_STRING;
-	arg.type = ARGTYPE_STR;
-	core_42ToFree42_string (buf, (*pt) + 1, buf[*pt] & 0x0f, &arg);
-	(*pt) += (buf[*pt] & 0x0f) + 1;
-	store_command_after(&pc, cmd, &arg);
+    int cmd;
+    arg_struct arg;
+    cmd = CMD_STRING;
+    arg.type = ARGTYPE_STR;
+    core_42ToFree42_string (buf, (*pt) + 1, buf[*pt] & 0x0f, &arg);
+    (*pt) += (buf[*pt] & 0x0f) + 1;
+    store_command_after(&pc, cmd, &arg);
 }
 
 /* hp-42s extensions decoding
  *
  * from original Free42 parametrized extensions decoding
  */
-void core_42ToFree42_42Ext (unsigned char *buf, int *pt) {
-	int cmd, flg;
-	arg_struct arg;
+int core_42ToFree42_42Ext (unsigned char *buf, int *pt, int l) {
+    int cmd, flg;
+    arg_struct arg;
+    if (l < 2) {
+        return 1;
+    }
+    if (l < (buf[(*pt)] & 0x0f)) {
+        return 1;
+    }
     cmd = hp42ext[buf[(*pt)+1] & 0x7f] & 0x0fff;
-	flg = hp42ext[buf[(*pt)+1] & 0x7f] >> 12;
-	if (flg <= 1) {
-		arg.type = (flg == 0) ? ARGTYPE_STR : ARGTYPE_IND_STR;
-		core_42ToFree42_string(buf, (*pt) + 2, (buf[(*pt)] & 0x0f) -1, &arg);
-	}
-	else if ((flg == 2) && (buf[*pt] == 0xf2)) {
-		core_42ToFree42_suffix(buf[(*pt)+2], &arg);
-	}
-	else if (flg == 3) {
-		switch (buf[(*pt)+1]) {
-			case 0xc0 :
-				//ASSIGN
-				arg.type = ARGTYPE_STR;
-				if ((buf[*pt] <= 0xf2) || (buf[(*pt) + (buf[*pt] & 0x0f)] > 17)) {
-					cmd = CMD_STRING;
-					core_42ToFree42_string (buf, (*pt) + 1, buf[*pt] & 0x0f, &arg);
-				}
-				else {
-					cmd = CMD_ASGN01 + buf[(*pt) + (buf[*pt] & 0x0f)];
-					core_42ToFree42_string (buf, (*pt) + 2, (buf[*pt] & 0x0f) - 2, &arg);
-				}
-				break;
-			case 0xc2 :
-				// KEY # XEQ name
-			case 0xc3 :
-				// KEY # GTO name
-			case 0xca :
-				// KEY # XEQ IND name
-			case 0xcb :
-				// KEY # GTO IND name
-			case 0xe2 :
-				// KEY # XEQ lbl
-			case 0xe3 :
-				// KEY # GTO lbl
-				if ((buf[*pt] <= 0xf2) || (buf[(*pt) + 2] < 1) || (buf[(*pt) + 2] > 9)) {
-					cmd = CMD_STRING;
-					core_42ToFree42_string (buf, (*pt) + 1, (buf[*pt] & 0x0f), &arg);
-				}
-				else {
-					if ((buf[(*pt)+1] & 0x07) == 0x02) {
-						cmd = CMD_KEY1X + buf[(*pt) + 2] - 1;
-					}
-					else {
-						cmd = CMD_KEY1G + buf[(*pt) + 2] - 1;
-					}
-					if ((buf[(*pt)+1] & 0xf8) == 0xc0) {
-						arg.type = ARGTYPE_STR;
-						core_42ToFree42_string (buf, (*pt) + 3, buf[*pt] & 0x0f - 2, &arg);
-					}
-					else if ((buf[(*pt)+1] & 0xf8) == 0xc8) {
-						arg.type = ARGTYPE_IND_STR;
-						core_42ToFree42_string (buf, (*pt) + 3, buf[*pt] & 0x0f - 2, &arg);
-					}
-					else if (((buf[(*pt)+1] & 0xf8) == 0xe0) && (buf[*pt] == 0xf3)) {
-						core_42ToFree42_suffix((buf[(*pt) + 3]), &arg);
-					}
-					else {
-						cmd = CMD_STRING;
-						core_42ToFree42_string (buf, (*pt) + 1, buf[*pt] & 0x0f, &arg);
-					}
-				}
-				break;
-			case 0xf7 :
-				// SIZE nnnn
-				if (buf[*pt] == 0xf3) {
-					cmd = CMD_SIZE;
+    flg = hp42ext[buf[(*pt)+1] & 0x7f] >> 12;
+    if (flg <= 1) {
+        arg.type = (flg == 0) ? ARGTYPE_STR : ARGTYPE_IND_STR;
+        core_42ToFree42_string(buf, (*pt) + 2, (buf[(*pt)] & 0x0f) -1, &arg);
+    }
+    else if ((flg == 2) && (buf[*pt] == 0xf2)) {
+        core_42ToFree42_suffix(buf[(*pt)+2], &arg);
+    }
+    else if (flg == 3) {
+        switch (buf[(*pt)+1]) {
+            case 0xc0 :
+                //ASSIGN
+                arg.type = ARGTYPE_STR;
+                if ((buf[*pt] <= 0xf2) || (buf[(*pt) + (buf[*pt] & 0x0f)] > 17)) {
+                    cmd = CMD_STRING;
+                    core_42ToFree42_string (buf, (*pt) + 1, buf[*pt] & 0x0f, &arg);
+                }
+                else {
+                    cmd = CMD_ASGN01 + buf[(*pt) + (buf[*pt] & 0x0f)];
+                    core_42ToFree42_string (buf, (*pt) + 2, (buf[*pt] & 0x0f) - 2, &arg);
+                }
+                break;
+            case 0xc2 :
+                // KEY # XEQ name
+            case 0xc3 :
+                // KEY # GTO name
+            case 0xca :
+                // KEY # XEQ IND name
+            case 0xcb :
+                // KEY # GTO IND name
+            case 0xe2 :
+                // KEY # XEQ lbl
+            case 0xe3 :
+                // KEY # GTO lbl
+                if ((buf[*pt] <= 0xf2) || (buf[(*pt) + 2] < 1) || (buf[(*pt) + 2] > 9)) {
+                    cmd = CMD_STRING;
+                    core_42ToFree42_string (buf, (*pt) + 1, (buf[*pt] & 0x0f), &arg);
+                }
+                else {
+                    if ((buf[(*pt)+1] & 0x07) == 0x02) {
+                        cmd = CMD_KEY1X + buf[(*pt) + 2] - 1;
+                    }
+                    else {
+                        cmd = CMD_KEY1G + buf[(*pt) + 2] - 1;
+                    }
+                    if ((buf[(*pt)+1] & 0xf8) == 0xc0) {
+                        arg.type = ARGTYPE_STR;
+                        core_42ToFree42_string (buf, (*pt) + 3, buf[*pt] & 0x0f - 2, &arg);
+                    }
+                    else if ((buf[(*pt)+1] & 0xf8) == 0xc8) {
+                        arg.type = ARGTYPE_IND_STR;
+                        core_42ToFree42_string (buf, (*pt) + 3, buf[*pt] & 0x0f - 2, &arg);
+                    }
+                    else if (((buf[(*pt)+1] & 0xf8) == 0xe0) && (buf[*pt] == 0xf3)) {
+                        core_42ToFree42_suffix((buf[(*pt) + 3]), &arg);
+                    }
+                    else {
+                        cmd = CMD_STRING;
+                        core_42ToFree42_string (buf, (*pt) + 1, buf[*pt] & 0x0f, &arg);
+                    }
+                }
+                break;
+            case 0xf7 :
+                // SIZE nnnn
+                if (buf[*pt] == 0xf3) {
+                    cmd = CMD_SIZE;
                     arg.type = ARGTYPE_NUM;
                     arg.val.num = (uint4)((buf[(*pt)+2] << 8) + buf[(*pt)+3]);
-				}
-				else {
-					cmd = CMD_STRING;
-					core_42ToFree42_string (buf, (*pt) + 1, buf[*pt] & 0x0f, &arg);
-				}
-				break;
-		}
-	}
-	else {
-		cmd = CMD_STRING;
-		arg.type = ARGTYPE_STR;
-		core_42ToFree42_string (buf, (*pt) + 1, buf[*pt] & 0x0f, &arg);
-	}
-	(*pt) += (buf[(*pt)] & 0x0f) + 1;
-	store_command_after(&pc, cmd, &arg);
+                }
+                else {
+                    cmd = CMD_STRING;
+                    core_42ToFree42_string (buf, (*pt) + 1, buf[*pt] & 0x0f, &arg);
+                }
+                break;
+        }
+    }
+    else {
+        // illegal how should we treat that ?
+        // like xrom 31,63 ?
+        cmd = CMD_XROM;
+        arg.type = ARGTYPE_NUM;
+        arg.val.num = (uint4)0x07ff;
+        // like a string ?
+        //cmd = CMD_STRING;
+        //arg.type = ARGTYPE_STR;
+        //core_42ToFree42_string (buf, (*pt) + 1, buf[*pt] & 0x0f, &arg);
+    }
+    (*pt) += (buf[(*pt)] & 0x0f) + 1;
+    store_command_after(&pc, cmd, &arg);
+    return 0;
 }
 
 /* Decode first row
@@ -716,36 +746,36 @@ void core_42ToFree42_42Ext (unsigned char *buf, int *pt) {
  * Null & Short Labels
  */
 void core_42ToFree42_shortLbl (unsigned char *buf, int *pt) {
-	int cmd;
-	arg_struct arg;
-	if (buf[*pt] == 0) {
-		cmd = CMD_NONE;
-		arg.type = ARGTYPE_NONE;
-	}
-	else {
-		cmd = CMD_LBL;
-		arg.type = ARGTYPE_NUM;
-		arg.val.num = buf[*pt] - 1;
-	}
-	(*pt)++;
-	if (cmd != CMD_NONE) {
-		store_command_after(&pc, cmd, &arg);
-	}
+    int cmd;
+    arg_struct arg;
+    if (buf[*pt] == 0) {
+        cmd = CMD_NONE;
+        arg.type = ARGTYPE_NONE;
+    }
+    else {
+        cmd = CMD_LBL;
+        arg.type = ARGTYPE_NUM;
+        arg.val.num = buf[*pt] - 1;
+    }
+    (*pt)++;
+    if (cmd != CMD_NONE) {
+        store_command_after(&pc, cmd, &arg);
+    }
 }
 
 /* Decode second row
  *
  * Digits, Gto, Xeq & W
  */
-void core_42ToFree42_row1 (unsigned char *buf, int *pt, int l) {
-	if (buf[*pt] >= 0x1d) {
-		// alpha gto / xeq / w
-		core_42ToFree42_alphaGto(buf, pt);
-	}
-	else {
-		// 0..9, +/-, ., E 
-		core_42ToFree42_number(buf, pt, l);
-	}
+int core_42ToFree42_row1 (unsigned char *buf, int *pt, int l) {
+    if (buf[*pt] >= 0x1d) {
+        // alpha gto / xeq / w
+        return core_42ToFree42_alphaGto(buf, pt, l);
+    }
+    else {
+        // 0..9, +/-, ., E 
+        return core_42ToFree42_number(buf, pt, l);
+    }
 }
 
 /* Decode third & fourth rows
@@ -753,13 +783,13 @@ void core_42ToFree42_row1 (unsigned char *buf, int *pt, int l) {
  * short sto & rcl
  */
 void core_42ToFree42_shortStoRcl (unsigned char *buf, int *pt) {
-	int cmd;
-	arg_struct arg;
-	cmd = (buf[*pt] & 0x10) ? CMD_STO : CMD_RCL;
-	arg.type = ARGTYPE_NUM;
-	arg.val.num = buf[*pt] & 0x0f;
-	(*pt)++;
-	store_command_after(&pc, cmd, &arg);
+    int cmd;
+    arg_struct arg;
+    cmd = (buf[*pt] & 0x10) ? CMD_STO : CMD_RCL;
+    arg.type = ARGTYPE_NUM;
+    arg.val.num = buf[*pt] & 0x0f;
+    (*pt)++;
+    store_command_after(&pc, cmd, &arg);
 }
 
 /* Decode one byte instructions
@@ -768,22 +798,22 @@ void core_42ToFree42_shortStoRcl (unsigned char *buf, int *pt) {
  * search in cmd array
  */
 void core_42ToFree42_1Byte (unsigned char *buf, int *pt) {
-	int cmd, i;
-	arg_struct arg;
-	uint4 inst;
-	cmd = CMD_NONE;
-	arg.type = ARGTYPE_NONE;
-	i = 0;
-	inst = (uint4)buf[*pt];
-	do {
-		if ((inst == (cmdlist(i)->hp42s_code & 0x0000ffff)) && ((cmdlist(i)->flags & FLAG_HIDDEN) == 0)) {
-			cmd = i;
-			store_command_after(&pc, cmd, &arg);
-			break;
-		}
-		i++;
-	} while (i < CMD_SENTINEL);
-	(*pt)++;
+    int cmd, i;
+    arg_struct arg;
+    uint4 inst;
+    cmd = CMD_NONE;
+    arg.type = ARGTYPE_NONE;
+    i = 0;
+    inst = (uint4)buf[*pt];
+    do {
+        if ((inst == (cmdlist(i)->hp42s_code & 0x0000ffff)) && ((cmdlist(i)->flags & FLAG_HIDDEN) == 0)) {
+            cmd = i;
+            store_command_after(&pc, cmd, &arg);
+            break;
+        }
+        i++;
+    } while (i < CMD_SENTINEL);
+    (*pt)++;
 }
 
 /* Decode two byte instructions
@@ -792,44 +822,44 @@ void core_42ToFree42_1Byte (unsigned char *buf, int *pt) {
  * search in cmd array
  */
 void core_42ToFree42_2Byte (unsigned char *buf, int *pt) {
-	int cmd, i;
-	arg_struct arg;
-	uint4 inst;
-	cmd = CMD_NONE;
-	arg.type = ARGTYPE_NONE;
-	if (buf[*pt] == 0xaf) {
-		// nothing to do
-	}
-	else if (buf [*pt] == 0xae) {
-		cmd = (buf[(*pt)+1] & 0x80) ? CMD_XEQ : CMD_GTO;
-		// once xeq vs gto decoded, force ind mode
-		core_42ToFree42_suffix(buf[(*pt)+1] | 0x80, &arg);
-	}
-	else if ((buf[*pt] >= 0xa0) && (buf[*pt] <= 0xa7)) {
-		cmd = CMD_XROM;
-		core_42toFree42_xrom(buf, pt, &cmd);
-		// take care of unknown XROM numbers
-		if (cmd == CMD_XROM) {
-			arg.type = ARGTYPE_NUM;
-			arg.val.num = (uint4)((buf[*pt] << 8) + buf[(*pt)+1]);
-		}
-	}
-	else {
-		i = 0;
-		inst = (uint4)buf[*pt];
-		do {
-			if ((inst == (cmdlist(i)->hp42s_code & 0x0000ffff)) && ((cmdlist(i)->flags & FLAG_HIDDEN) == 0)) {
-				cmd = i;
-				break;
-			}
-			i++;
-		} while (i < CMD_SENTINEL);
-		core_42ToFree42_suffix(buf[(*pt)+1], &arg);
-	}
-	(*pt) += 2;
-	if (cmd != CMD_NONE) {
-		store_command_after(&pc, cmd, &arg);
-	}
+    int cmd, i;
+    arg_struct arg;
+    uint4 inst;
+    cmd = CMD_NONE;
+    arg.type = ARGTYPE_NONE;
+    if (buf[*pt] == 0xaf) {
+        // nothing to do
+    }
+    else if (buf [*pt] == 0xae) {
+        cmd = (buf[(*pt)+1] & 0x80) ? CMD_XEQ : CMD_GTO;
+        // once xeq vs gto decoded, force ind mode
+        core_42ToFree42_suffix(buf[(*pt)+1] | 0x80, &arg);
+    }
+    else if ((buf[*pt] >= 0xa0) && (buf[*pt] <= 0xa7)) {
+        cmd = CMD_XROM;
+        core_42toFree42_xrom(buf, pt, &cmd);
+        // take care of unknown XROM numbers
+        if (cmd == CMD_XROM) {
+            arg.type = ARGTYPE_NUM;
+            arg.val.num = (uint4)((buf[*pt] << 8) + buf[(*pt)+1]);
+        }
+    }
+    else {
+        i = 0;
+        inst = (uint4)buf[*pt];
+        do {
+            if ((inst == (cmdlist(i)->hp42s_code & 0x0000ffff)) && ((cmdlist(i)->flags & FLAG_HIDDEN) == 0)) {
+                cmd = i;
+                break;
+            }
+            i++;
+        } while (i < CMD_SENTINEL);
+        core_42ToFree42_suffix(buf[(*pt)+1], &arg);
+    }
+    (*pt) += 2;
+    if (cmd != CMD_NONE) {
+        store_command_after(&pc, cmd, &arg);
+    }
 }
 
 /* Decode short GTO
@@ -837,33 +867,37 @@ void core_42ToFree42_2Byte (unsigned char *buf, int *pt) {
  * row b
  */
 void core_42ToFree42_shortGto (unsigned char *buf, int *pt) {
-	int cmd;
-	arg_struct arg;
-	cmd = CMD_NONE;
-	if (buf[*pt] != 0xb0) {
-		cmd = CMD_GTO;
-		arg.type = ARGTYPE_NUM;
-		arg.val.num = (buf[*pt] & 0x0f) - 1;
-	}
-	(*pt) += 2;
-	if (cmd != CMD_NONE) {
-		store_command_after(&pc, cmd, &arg);
-	}
+    int cmd;
+    arg_struct arg;
+    cmd = CMD_NONE;
+    if (buf[*pt] != 0xb0) {
+        cmd = CMD_GTO;
+        arg.type = ARGTYPE_NUM;
+        arg.val.num = (buf[*pt] & 0x0f) - 1;
+    }
+    (*pt) += 2;
+    if (cmd != CMD_NONE) {
+        store_command_after(&pc, cmd, &arg);
+    }
 }
 
 /* Decode row c
  *
  * mainly global labels...
  */
-void core_42ToFree42_rowc (unsigned char *buf, int *pt) {
-	if (buf[*pt] >= 0xce) {
-		// x <> or lbl, basicaly a 2 byte instruction
-		core_42ToFree42_2Byte(buf, pt);
-	}
-	else {
-		// global label or end...
-		core_42ToFree42_globalEnd(buf, pt);
-	}
+int core_42ToFree42_rowc (unsigned char *buf, int *pt, int l) {
+    if (buf[*pt] >= 0xce) {
+        // x <> or lbl, basicaly a 2 byte instruction
+        if (l > 1) {
+            core_42ToFree42_2Byte(buf, pt);
+            return 0;
+        }
+    }
+    else {
+        // global label or end...
+        return core_42ToFree42_globalEnd(buf, pt, l);
+    }
+    return 1;
 }
 
 /* gto / xeq
@@ -871,31 +905,36 @@ void core_42ToFree42_rowc (unsigned char *buf, int *pt) {
  * row d & e
  */
 void core_42ToFree42_gtoXeq (unsigned char *buf, int *pt) {
-	int cmd;
-	arg_struct arg;
-	cmd = ((buf[*pt] >> 4) == 0x0e) ? CMD_XEQ : CMD_GTO;
-	core_42ToFree42_suffix(buf[(*pt)+2] & 0x7f, &arg);
-	(*pt) += 3;
-	store_command_after(&pc, cmd, &arg);
+    int cmd;
+    arg_struct arg;
+    cmd = ((buf[*pt] >> 4) == 0x0e) ? CMD_XEQ : CMD_GTO;
+    core_42ToFree42_suffix(buf[(*pt)+2] & 0x7f, &arg);
+    (*pt) += 3;
+    store_command_after(&pc, cmd, &arg);
 }
 
 /* test and hp-42s extensions
  *
  * row f
  */
-void core_42ToFree42_string (unsigned char *buf, int *pt) {
-	if (buf[*pt] == 0xf0) {
-		core_42ToFree42_string0(buf, pt);
-	}
-	else if (buf[*pt] == 0xf1) {
-		core_42ToFree42_string1(buf, pt);
-	}
-	else if (buf[(*pt)+1] & 0x80) {
-		core_42ToFree42_42Ext(buf, pt);
-	}
-	else {
-		core_42ToFree42_stringn(buf, pt);
-	}
+int core_42ToFree42_string_f (unsigned char *buf, int *pt, int l) {
+    if (buf[*pt] == 0xf0) {
+        // one byte
+        core_42ToFree42_string0(buf, pt);
+        return 0;
+    }
+    else if ((l > 1) && (buf[*pt] == 0xf1)){
+        core_42ToFree42_string1(buf, pt);
+        return 0;
+    }
+    else if ((l > 2) && (buf[(*pt)+1] & 0x80)) {
+        return core_42ToFree42_42Ext(buf, pt, l);
+    }
+    else if ((l > 2) && (l > (buf[*pt] & 0x0f))) {
+        core_42ToFree42_stringn(buf, pt);
+        return 0;
+    }
+    return 1;
 }
 
 /* Decode instructions
@@ -903,42 +942,72 @@ void core_42ToFree42_string (unsigned char *buf, int *pt) {
  * adapted from decomp41.c A.R. Duell
  */
 int core_42ToFree42 (unsigned char *buf, int *pt, int l){
-	int endFlag = 0;
-	switch(buf[*pt]>>4) {
-		case 0x00 :
-			core_42ToFree42_shortLbl(buf, pt);
-			break;
-		case 0x01 :
-			core_42ToFree42_row1(buf, pt, l);
-			break;
-		case 0x02 :
-		case 0x03 :
-			core_42ToFree42_shortStoRcl(buf, pt);
-			break;
-		case 0x04 :
-		case 0x05 :
-		case 0x06 :
-		case 0x07 :
-		case 0x08 :
-			core_42ToFree42_1Byte(buf, pt);
-			break;
-		case 0x09 :
-		case 0x0a :
-			core_42ToFree42_2Byte(buf, pt);
-			break;
-		case 0x0b :
-			core_42ToFree42_shortGto(buf, pt);
-			break;
-		case 0x0c :
-			core_42ToFree42_rowc(buf, pt);
-			break;
-		case 0x0d :
-		case 0x0e :
-			core_42ToFree42_gtoXeq(buf, pt);
-			break;
-		case 0x0f:
-			core_42ToFree42_string(buf, pt);
-			break;
-	}
-	return 0;
+    int oldPt, needMore;
+    needMore = 1;
+    if (l < 1) {
+        return needMore;
+    }
+    oldPt = *pt;
+    switch(buf[*pt]>>4) {
+        case 0x00 :
+            // one byte
+            core_42ToFree42_shortLbl(buf, pt);
+            needMore = 0;
+            break;
+        case 0x01 :
+            // variable size
+            needMore = core_42ToFree42_row1(buf, pt, l);
+            break;
+        case 0x02 :
+        case 0x03 :
+            // one byte
+            core_42ToFree42_shortStoRcl(buf, pt);
+            needMore = 0;
+            break;
+        case 0x04 :
+        case 0x05 :
+        case 0x06 :
+        case 0x07 :
+        case 0x08 :
+            // one byte
+            core_42ToFree42_1Byte(buf, pt);
+            needMore = 0;
+            break;
+        case 0x09 :
+        case 0x0a :
+            // two bytes
+            if (l > 1) {
+                core_42ToFree42_2Byte(buf, pt);
+                needMore = 0;
+            }
+            break;
+        case 0x0b :
+            // two bytes
+            if (l > 1) {
+                core_42ToFree42_shortGto(buf, pt);
+                needMore = 0;
+            }
+            break;
+        case 0x0c :
+            // variable size
+            needMore = core_42ToFree42_rowc(buf, pt, l);
+            break;
+        case 0x0d :
+        case 0x0e :
+            // three bytes
+            if (l > 2) {
+                core_42ToFree42_gtoXeq(buf, pt);
+                needMore = 0;
+            }
+            break;
+        case 0x0f:
+            // variable size
+            needMore = core_42ToFree42_string_f(buf, pt, l);
+            break;
+    }
+    if (needMore) {
+        // restore pt
+        *pt = oldPt;
+    }
+    return needMore;
 }

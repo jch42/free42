@@ -22,6 +22,14 @@
 
 LRESULT CALLBACK HpIlPrefs(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
 
+/* open and close extension 
+ *
+ * read extension parameters and init communications
+ * save extension parameters and close communications
+ */
+void open_extension(char * state_ext);
+void close_extension(char * state_ext);
+
 /* shell_check_connectivity()
  *
  * check loop i/o conectivity

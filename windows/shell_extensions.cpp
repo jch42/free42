@@ -30,6 +30,7 @@
 
 #include "free42.h"
 #include "core_globals.h"
+#include "core_ebml.h"
 #include "core_main.h"
 #include "hpil_common.h"
 #include "shell_extensions.h"
@@ -47,6 +48,9 @@ typedef struct state_extensions {
 } state_extensions_type;
 
 static state_extensions_type state_extensions;
+
+extern FILE * EbmlStateFile;
+extern HPIL_Settings hpil_settings;
 
 // i/o for hpil emulation
 bool modeEnabled, modeIP, modePIL_Box;
@@ -239,7 +243,198 @@ int err;
     }
     return FALSE;
 }
-	
+
+void open_extension(char* stateExtFilename) {
+ebmlElement_Struct el;
+int l, version;
+
+	// try to get ebml state file
+	if (_access(stateExtFilename,0) != -1) {
+        EbmlStateFile = fopen(stateExtFilename, "rb");
+        // open global master document
+        el.docId = 0;
+        el.elId = EBMLFree42;
+        if (ebmlGetEl(&el) != 1) {
+            goto openExtensionError;
+        }
+        // use global master document
+        el.docId = el.elId;
+        el.docLen = el.elLen;
+        el.docFirstEl = el.pos;
+        // get version
+        el.elId = EBMLFree42Version;
+        if (ebmlGetEl(&el) != 1) {
+            goto openExtensionError;
+        }
+        version = el.elLen;
+        // get read version
+        el.elId = EBMLFree42ReadVersion;
+        if (ebmlGetEl(&el) != 1) {
+            goto openExtensionError;
+        }
+        // read version compatibility ?
+        if (el.elLen > _EBMLFree42Version) {
+            goto openExtensionError;
+        }
+		// get Extensions document
+        el.elId = EBMLFree42Extensions;
+        if (ebmlGetEl(&el) != 1) {
+            goto openExtensionError;
+        }
+        el.docId = el.elId;
+        el.docLen = el.elLen;
+        el.docFirstEl = el.pos;
+        // get version
+        el.elId = EBMLFree42ExtensionsVersion;
+        if (ebmlGetEl(&el) != 1) {
+            goto openExtensionError;
+        }
+        version = el.elLen;
+        // get read version
+        el.elId = EBMLFree42ExtensionsReadVersion;
+        if (ebmlGetEl(&el) != 1) {
+            goto openExtensionError;
+        }
+        // read version compatibility
+        if (el.elLen > _EBMLFree42ExtensionsVersion) {
+            goto openExtensionError;
+        }
+        // open hp-il document
+        el.elId = EBMLFree42ExtensionsHpil;
+        if (ebmlGetEl(&el) != 1) {
+            goto openExtensionError;
+        }
+        // use hp-il preferences document
+        el.docId = el.elId;
+        el.docLen = el.elLen;
+        el.docFirstEl = el.pos;
+        // get version
+        el.elId = EBMLFree42ExtensionsHpilVersion;
+        if (ebmlGetEl(&el) != 1) {
+            goto openExtensionError;
+        }
+        version = el.elLen;
+        // get read version
+        el.elId = EBMLFree42ExtensionsHpilReadVersion;
+        if (ebmlGetEl(&el) != 1) {
+            goto openExtensionError;
+        }
+        // read version compatibility ?
+        if (el.elLen > _EBMLFree42ExtensionsHpilVersion) {
+            goto openExtensionError;
+        }
+		// Get extensions parameters
+		el.elId = EL_hpil_comPort;
+		l = sizeof (state_extensions.comPort);
+		if (!ebmlReadElString(&el, state_extensions.comPort, &l)) {
+            goto openExtensionError;
+		}
+		state_extensions.comPort[l] = 0;
+		// target IP
+		el.elId = EL_hpil_outIP;
+		if (ebmlGetEl(&el) != 1) {
+            goto openExtensionError;
+		}
+		state_extensions.outIP = el.elLen;
+		// target port
+		el.elId = EL_hpil_inTcpPort;
+		if (ebmlGetEl(&el) != 1) {
+            goto openExtensionError;
+		}
+		state_extensions.inTcpPort = el.elLen;
+		// listening port
+		el.elId = EL_hpil_outTcpPort;
+		if (ebmlGetEl(&el) != 1) {
+            goto openExtensionError;
+		}
+		state_extensions.outTcpPort = el.elLen;
+		// speeds
+		el.elId = EL_hpil_highSpeed;
+		if (!ebmlReadElBool(&el, &state_extensions.highSpeed)) {
+            goto openExtensionError;
+		}
+		el.elId = EL_hpil_medSpeed;
+		if (!ebmlReadElBool(&el, &state_extensions.medSpeed)) {
+            goto openExtensionError;
+		}
+		// take care of pilBox
+		el.elId = EL_hpil_pilBox;
+		if (!ebmlReadElBool(&el, &state_extensions.pilBox)) {
+            goto openExtensionError;
+		}
+		// core HP-IL parameters
+		el.elId = EL_hpil_selected;
+		if (!ebmlReadElInt(&el, &hpil_settings.selected)) {
+            goto openExtensionError;
+		}
+		el.elId = EL_hpil_print;
+		if (!ebmlReadElInt(&el, &hpil_settings.print)) {
+			goto openExtensionError;
+		}
+		el.elId = EL_hpil_disk;
+		if (!ebmlReadElInt(&el, &hpil_settings.disk)) {
+            goto openExtensionError;
+		}
+		el.elId = EL_hpil_plotter;
+		if (!ebmlReadElInt(&el, &hpil_settings.plotter)) {
+            goto openExtensionError;
+		}
+		el.elId = EL_hpil_prtAid;
+		if (!ebmlReadElInt(&el, &hpil_settings.prtAid)) {
+            goto openExtensionError;
+		}
+		el.elId = EL_hpil_dskAid;
+		if (!ebmlReadElInt(&el, &hpil_settings.dskAid)) {
+            goto openExtensionError;
+		}
+	}
+	goto openExtensionDone;
+  openExtensionError:
+	// (re)init anything 
+	state_extensions.comPort[0] = 0;
+	state_extensions.outIP = 0;
+	state_extensions.outTcpPort = 0;
+	state_extensions.inTcpPort = 0;
+	state_extensions.medSpeed = state_extensions.highSpeed = state_extensions.pilBox = false;
+	hpil_settings.selected = 0;
+	hpil_settings.print = 0;
+	hpil_settings.prtAid = 0;
+	hpil_settings.disk = 0;
+	hpil_settings.dskAid = 0;
+	hpil_settings.plotter = 0;
+  openExtensionDone:
+	shell_init_port();
+}
+
+void close_extension(char* stateExtFilename) {
+	EbmlStateFile = fopen(stateExtFilename, "wb");
+    if (EbmlStateFile != NULL) {
+	    ebmlWriteMasterHeader();
+	    ebmlWriteExtensionsDocument();
+	    ebmlWriteExtensionsHpilDocument();
+		// i/o config
+		ebmlWriteElString(EL_hpil_comPort, strlen(state_extensions.comPort), state_extensions.comPort);
+		ebmlWriteElVInt(EL_hpil_outIP, state_extensions.outIP);
+		ebmlWriteElVInt(EL_hpil_outTcpPort, state_extensions.outTcpPort);
+		ebmlWriteElVInt(EL_hpil_inTcpPort, state_extensions.inTcpPort);
+		ebmlWriteElBool(EL_hpil_highSpeed, state_extensions.highSpeed);
+		ebmlWriteElBool(EL_hpil_medSpeed, state_extensions.highSpeed);
+		ebmlWriteElBool(EL_hpil_pilBox, state_extensions.pilBox);
+		// internal HP-IL config
+		ebmlWriteElInt(EL_hpil_selected, hpil_settings.selected);
+		ebmlWriteElInt(EL_hpil_print, hpil_settings.print);
+		ebmlWriteElInt(EL_hpil_disk, hpil_settings.disk);
+		ebmlWriteElInt(EL_hpil_plotter, hpil_settings.plotter);
+		ebmlWriteElInt(EL_hpil_prtAid, hpil_settings.prtAid);
+		ebmlWriteElInt(EL_hpil_dskAid, hpil_settings.dskAid);
+		// done
+		ebmlWriteEndOfDocument();
+		ebmlWriteEndOfDocument();
+		ebmlWriteEndOfDocument();
+    }
+	shell_close_port();
+ }
+
 static int shell_init_IP() {
 	char ipStrBuf[16];
 	char portStrBuf[6];
@@ -509,7 +704,6 @@ static void shell_close_serial() {
 
 static void shell_init_port() {
 	modeEnabled = false;
-	modeIP = false;
 	modePIL_Box = false;
 
 	if (!strcmp(state_extensions.comPort," Disabled")) {
@@ -518,14 +712,12 @@ static void shell_init_port() {
 		shell_close_IP();
 		if (!shell_init_IP()) {
 			modeEnabled = true;
-			modeIP = true;
 		}
 	}
 	else {
 		shell_close_serial();
 		if (!shell_init_serial()) {
 			modeEnabled = true;
-			modeIP = false;
 			modePIL_Box = state_extensions.pilBox;
 		}
 	}

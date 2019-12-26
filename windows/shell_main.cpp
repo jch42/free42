@@ -117,6 +117,7 @@ char free42dirname[FILENAMELEN];
 static char statefilename[FILENAMELEN];
 static FILE *statefile = NULL;
 static char printfilename[FILENAMELEN];
+static char extensionfilename[FILENAMELEN];
 
 static FILE *print_txt = NULL;
 static FILE *print_gif = NULL;
@@ -315,6 +316,7 @@ static BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
     sprintf(statefilename, "%s\\state.bin", free42dirname);
     sprintf(printfilename, "%s\\print.bin", free42dirname);
     sprintf(keymapfilename, "%s\\keymap.txt", free42dirname);
+    sprintf(extensionfilename, "%s\\state.ext", free42dirname);
 
     read_key_map(keymapfilename);
 
@@ -413,6 +415,8 @@ static BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 
     if (hMainWnd == NULL)
         return FALSE;
+
+	open_extension(extensionfilename);
 
     core_init(init_mode, version, core_state_file_name, core_state_file_offset);
 
@@ -1593,6 +1597,8 @@ static void Quit() {
         shell_finish_gif(gif_seeker, gif_writer);
         fclose(print_gif);
     }
+
+	close_extension(extensionfilename);
 
     shell_spool_exit();
 }

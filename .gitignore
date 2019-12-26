@@ -241,6 +241,7 @@
 /windows/core_ebml.cpp
 /windows/core_ebml.h
 /windows/core_extensions.h
+/windows/core_extensions.cpp
 /windows/core_globals.cpp
 /windows/core_globals.h
 /windows/core_helpers.cpp

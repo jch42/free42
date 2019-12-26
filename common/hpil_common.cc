@@ -31,6 +31,8 @@
 #include "shell_extensions.h"
 #include "string.h"
 
+HPIL_Settings hpil_settings;
+
 HPIL_Controller hpil_core;
 HpilXController hpilXCore;
 int controllerCommand;
@@ -39,8 +41,6 @@ uint4 loopTimeout;
 AltBuf hpil_controllerAltBuf;
 DataBuf hpil_controllerDataBuf;
 
-
-HPIL_Settings hpil_settings;
 void (*hpil_emptyListenBuffer)(void);
 void (*hpil_fillTalkBuffer)(void);
 
@@ -134,51 +134,6 @@ void hpil_close(bool modeEnabled, bool modePil_Box) {
 		frame = M_NOP;
 		while (!shell_read_frame(&frame) && loopTimeout--);
 	}
-}
-
-/* persist_hpil
- *
- * save parts of hpil settings
- */
-bool persist_hpil(void) {
-	if (!ebmlWriteElInt(EL_hpil_selected, hpil_settings.selected)) {
-		return false;
-	}
-	if (!ebmlWriteElInt(EL_hpil_print, hpil_settings.print)) {
-		return false;
-	}
-	if (!ebmlWriteElInt(EL_hpil_disk, hpil_settings.disk)) {
-		return false;
-	}
-	if (!ebmlWriteElInt(EL_hpil_plotter, hpil_settings.plotter)) {
-		return false;
-	}
-	if (!ebmlWriteElInt(EL_hpil_prtAid, hpil_settings.prtAid)) {
-		return false;
-	}
-	if (!ebmlWriteElInt(EL_hpil_dskAid, hpil_settings.dskAid)) {
-		return false;
-	}
-	if (!ebmlWriteElBool(EL_hpil_modeEnabled, hpil_settings.modeEnabled)) {
-		return false;
-	}
-	if (!ebmlWriteElBool(EL_hpil_modeTransparent, hpil_settings.modeTransparent)) {
-		return false;
-	}
-	if (!ebmlWriteElBool(EL_hpil_modePIL_Box, hpil_settings.modePIL_Box)) {
-		return false;
-	}
-	return true;
-}
-
-/* unpersist_hpil
- *
- * get back parts of hpil settings
- */
-bool unpersist_hpil(int ver) {
-//	return shell_read_saved_state(&hpil_settings, sizeof(hpil_settings)) == sizeof(hpil_settings);
-//  need to recover where this is saved...
-	return true;
 }
 
 /* hpil_checkup

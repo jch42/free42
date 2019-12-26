@@ -89,8 +89,6 @@ typedef struct {
 
 void hpil_init(bool modeEnabled, bool modePil_Box);
 void hpil_close(bool modeEnabled, bool modePil_Box);
-bool persist_hpil(void);
-bool unpersist_hpil(int ver);
 int hpil_check(void);
 int hpil_worker(int interrupted);
 int call_ilCompletion(int (*hpil_completion_call)(int));

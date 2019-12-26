@@ -27,6 +27,7 @@
 #include "core_variables.h"
 #include "shell.h"
 #include "shell_spool.h"
+#include "hpil_printer.h"
 
 
 /********************/
@@ -2193,6 +2194,7 @@ void redisplay() {
 
 void print_display() {
     shell_print(NULL, 0, display, 17, 0, 0, 131, 16);
+	hpil_printLcd(display, 17, 0, 0, 131, 16);
 }
 
 typedef struct {

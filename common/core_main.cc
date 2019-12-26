@@ -4229,6 +4229,7 @@ static void stop_interruptible() {
 }
 
 static int handle_error(int error) {
+int run = 0;
     if (mode_running) {
         if (error == ERR_RUN)
             error = ERR_NONE;
@@ -4300,6 +4301,7 @@ static int handle_error(int error) {
         return 0;
     } else {
         if (error == ERR_RUN) {
+			run = 1;
             set_running(true);
             error = ERR_NONE;
         }
@@ -4312,6 +4314,6 @@ static int handle_error(int error) {
         }
         if (error != ERR_NONE && error != ERR_STOP)
             display_error(error, 1);
-        return 0;
+        return run;
     }
 }

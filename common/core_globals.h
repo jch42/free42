@@ -290,6 +290,16 @@ typedef struct {
     char text[6];
 } vartype_string;
 
+/* one vartype to rule them all*/
+typedef union {
+    vartype *g;
+    vartype_real *r;
+    vartype_complex *c;
+    vartype_realmatrix *rm;
+    vartype_complexmatrix *cm;
+    vartype_string *s;
+} allvartypes_ptr;
+
 /******************/
 /* Emulator state */
 /******************/
