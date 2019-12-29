@@ -150,11 +150,13 @@ char opt[5] = "Std ";
 		Do_DT_State();
 		Do_DD_State();
 	}
-	/*if (StateChanged && (debugLevel & DebugMonitorStates)) {
+	/*
+	if (StateChanged && (debugLevel & DebugMonitorStates)) {
 		cycles++;
 		tprintf(buf,"\n{Cycle# %04x, %s, %s, %s, %s, %s, %s , %s, %s , pseudo %08x, chng %01x, %s} ",cycles,R_ist[R_State],D_ist[D_State],A_ist[A_State],S_ist[S_State],C_ist[C_State],T_ist[T_State],L_ist[L_State],AA_ist[AA_State],_pseudoMsg,StateChanged,opt);
-		shell_write_console(buf);
-	}*/
+		shell_log(buf);
+	*/
+	}
 	return (StateChanged);
 }
 

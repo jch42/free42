@@ -1765,7 +1765,7 @@ static void hpil_readpRefreshBuf(void) {
 	// first run
 	if (s.pBlocks == 0) {
 		s.saved_prgm = current_prgm;
-		goto_dot_dot(true);
+		goto_dot_dot(false);
 		read_prgm = current_prgm;
 		s.index = 0;
 		crc = 0;

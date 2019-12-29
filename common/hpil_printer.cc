@@ -75,6 +75,7 @@ extern DataBuf hpil_controllerDataBuf;
  *
  */
 unsigned char printerStatus;
+unsigned char printerAccessoryId;
 //char *printText;
 //int printLength;
 //int printed;
@@ -87,10 +88,10 @@ int rasterLine = 0;
  *
  */
 const unsigned char TranslateCode[] = {
-	0x00, 0x01, 0x3f, 0x53, 0x1f, 0x7e, 0x3f, 0x7b,
+	0xAF, 0x01, 0x3f, 0x53, 0x1f, 0x7e, 0x3e, 0x7b,
 	0x3f, 0x3f, 0x0a, 0x3f, 0x1d, 0x0d, 0x07, 0x7d,
 	0x03, 0x0c, 0x1e, 0x3f, 0x13, 0x3f, 0x16, 0x7c,
-	0x3f, 0x1b, 0x3f, 0x3f, 0x18, 0x1a, 0x1e, 0x3f,
+	0x45, 0x1b, 0x3f, 0x3f, 0x17, 0x1a, 0x1e, 0x3f,
 	0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27,
 	0x28, 0x29, 0x2a, 0x2b, 0x2c, 0x2d, 0x2e, 0x2f,
 	0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37,
@@ -99,10 +100,10 @@ const unsigned char TranslateCode[] = {
 	0x48, 0x49, 0x4a, 0x4b, 0x4c, 0x4d, 0x4e, 0x4f,
 	0x50, 0x51, 0x52, 0x53, 0x54, 0x55, 0x56, 0x57,
 	0x58, 0x59, 0x5a, 0x5b, 0x5c, 0x5d, 0x5e, 0x5f,
-	0x3f, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67,
+	0x60, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67,
 	0x68, 0x69, 0x6a, 0x6b, 0x6c, 0x6d, 0x6e, 0x6f,
 	0x70, 0x71, 0x72, 0x73, 0x74, 0x75, 0x76, 0x77,
-	0x78, 0x79, 0x7a, 0x3f, 0x3f, 0x3f, 0x3f, 0x7f
+	0x78, 0x79, 0x7a, 0xfb, 0xfc, 0xfd, 0xfe, 0x7f
 };
 
 void hpil_printRaster(unsigned char*, int);
@@ -118,8 +119,9 @@ int hpil_printText_completion(int);
  * entry point for print worker
  */
 void hpil_printText(const char *text, int length, int left_justified) {
-	int i, j;
+	int i = 0, j = 0;
 	int statusUpdate;
+	bool eightBitsMode = false;
 
 	if (hpil_check() != ERR_NONE)
         return;
@@ -130,60 +132,83 @@ void hpil_printText(const char *text, int length, int left_justified) {
 	if (hpil_controllerAltBuf.data[0] & PrinterStatusER)
 		return;
 	printerStatus = hpil_controllerAltBuf.data[1];
-	j = 0;
-	if (!(printerStatus & PrinterStatusEB)) {
-		// insert escape sequence to go to 8 bits mode, Esc 1 (thanks to TOS, note on manual)
-		toPrinter[j++] = 0x1b;
-		toPrinter[j++] = 0x7c;
-		printerStatus |= PrinterStatusEB;
-	}
-	if (!left_justified && !(printerStatus & PrinterStatusRJ)) {
-		// set right justify
-		toPrinter[j++] = 0xe8;
-		printerStatus |= PrinterStatusRJ;
-	}
-	else if (left_justified && (printerStatus & PrinterStatusRJ)) {
-		// set left justify
-		toPrinter[j++] = 0xe0;
-		printerStatus &= ~PrinterStatusRJ;
-	}
-	// default to single / char / upper
-	statusUpdate = 0;
-	toPrinter[j] = 0xd0;
-	// define mode
-	if (flags.f.double_wide_print && !(printerStatus & PrinterStatusDW)) {
-		toPrinter[j] |= 0x04;
-		printerStatus |= PrinterStatusDW;
-		statusUpdate = 1;
-	}
-	else if (!flags.f.double_wide_print && (printerStatus & PrinterStatusDW)) {
-		printerStatus &= ~PrinterStatusDW;
-		statusUpdate = 1;
-	}
-	if (flags.f.lowercase_print & !(printerStatus & PrinterStatusLC)) {
-		toPrinter[j] |= 0x01;
-		printerStatus |= PrinterStatusLC;
-		statusUpdate = 1;
-	}
-	else if (!flags.f.lowercase_print & (printerStatus & PrinterStatusLC)) {
-		printerStatus &= ~PrinterStatusLC;
-		statusUpdate = 1;
-	}
-	if (statusUpdate) {
-		j++;
-	}
-	i = 0;
-	do {
-		while ((j < 0x66) && (i < length)) {
-			toPrinter[j++] = TranslateCode[text[i++] & 0x7f];
+	if (printerAccessoryId == 0x20) { 
+		// only for 82162A ?
+		if (!(printerStatus & PrinterStatusEB)) {
+			// insert escape sequence to go to 8 bits mode
+			toPrinter[j++] = 0x1b;
+			toPrinter[j++] = 0x7c;
+			printerStatus |= PrinterStatusEB;
+			}
+		eightBitsMode = true;
+		if (!left_justified && !(printerStatus & PrinterStatusRJ)) {
+			// set right justify
+			toPrinter[j++] = 0xe8;
+			printerStatus |= PrinterStatusRJ;
 		}
-		if ((i == length) && (j < 0x66)) {
-			toPrinter[j++] = 0x0d;
-			toPrinter[j++] = 0x0a;
-			i++;
+		else if (left_justified && (printerStatus & PrinterStatusRJ)) {
+			// set left justify
+			toPrinter[j++] = 0xe0;
+			printerStatus &= ~PrinterStatusRJ;
 		}
-		hpil_printText(toPrinter, j);
-	} while (i <= length);
+		// default to single / char / upper
+		statusUpdate = 0;
+		toPrinter[j] = 0xd0;
+		// define mode
+		if (flags.f.double_wide_print && !(printerStatus & PrinterStatusDW)) {
+			toPrinter[j] |= 0x04;
+			printerStatus |= PrinterStatusDW;
+			statusUpdate = 1;
+		}
+		else if (!flags.f.double_wide_print && (printerStatus & PrinterStatusDW)) {
+			printerStatus &= ~PrinterStatusDW;
+			statusUpdate = 1;
+		}
+		if (flags.f.lowercase_print & !(printerStatus & PrinterStatusLC)) {
+			toPrinter[j] |= 0x01;
+			printerStatus |= PrinterStatusLC;
+			statusUpdate = 1;
+		}
+		else if (!flags.f.lowercase_print & (printerStatus & PrinterStatusLC)) {
+			printerStatus &= ~PrinterStatusLC;
+			statusUpdate = 1;
+		}
+		if (statusUpdate) {
+			j++;
+		}
+		do {
+			while ((j < 0x66) && (i < length)) {
+				if (TranslateCode[text[i] & 0x7f] & 0x80) {
+					// switch back to 7 bits mode / standard char set, will occur only once...
+					if (eightBitsMode) {
+						toPrinter[j++] = 0xfc;
+						eightBitsMode = false;
+					}
+				}
+				toPrinter[j++] = TranslateCode[text[i++] & 0x7f] & 0x7f;
+			}
+			if ((i == length) && (j < 0x66)) {
+				toPrinter[j++] = 0x0d;
+				toPrinter[j++] = 0x0a;
+				i++;
+			}
+			hpil_printText(toPrinter, j);
+		} while (i <= length);
+	}
+	else {
+		do {
+			// other printers
+			while ((j < 0x66) && (i < length)) {
+				toPrinter[j++] = text[i++] & 0x7f;
+			}
+			if ((i == length) && (j < 0x66)) {
+				toPrinter[j++] = 0x0d;
+				toPrinter[j++] = 0x0a;
+				i++;
+			}
+			hpil_printText(toPrinter, j);
+		} while (i <= length);
+	}
 }
 
 /* hpil_printLCD
@@ -446,6 +471,7 @@ int hpil_printerSelect_completion(int error) {
 				break;
 			case 2:
 				if (hpilXCore.bufPtr && ((hpil_controllerAltBuf.data[0] & 0x20) == 0x20)) {
+					printerAccessoryId = hpil_controllerAltBuf.data[0];
 					ILCMD_nop;
 					hpil_step++;
 				}
@@ -463,6 +489,7 @@ int hpil_printerSelect_completion(int error) {
 			case 3 :
 				if (hpilXCore.bufPtr) {
 					if ((hpil_controllerAltBuf.data[0] & 0x20) == 0x20) {
+						printerAccessoryId = hpil_controllerAltBuf.data[0];
 						hpil_settings.print = i;
 						error = ERR_NONE;
 					}

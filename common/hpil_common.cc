@@ -450,7 +450,8 @@ int hpil_wait_sub(int error) {
 							error = rtn_il_completion();
 							break;
 						case 0x20:		// > Busy
-							hpil_step = 1;
+							ILCMD_nop;
+							hpil_step = 0;
 							break;
 						default:		// Anything else - same code as idle
 							ILCMD_lun;

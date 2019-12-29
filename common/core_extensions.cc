@@ -559,10 +559,10 @@ int core_42ToFree42_globalEnd (unsigned char *buf, int *pt, int l) {
         store_command_after(&pc, cmd, &arg);
     }
     else {
-        cmd = CMD_END;
-        arg.type = ARGTYPE_NONE;
-        store_command_after(&pc, cmd, &arg);
-        goto_dot_dot(false);
+		// Is this teally needed ?
+		//cmd = CMD_END;
+		//arg.type = ARGTYPE_NONE;
+		//store_command_after(&pc, cmd, &arg);
     }
     (*pt) += (buf[(*pt) + 2] & 0x80) ? (buf[(*pt) + 2] & 0x0f) + 3 : 3;
     return 0;

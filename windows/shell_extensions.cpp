@@ -35,6 +35,7 @@
 #include "core_ebml.h"
 #include "core_main.h"
 #include "hpil_common.h"
+#include "shell.h"
 #include "shell_extensions.h"
 
 #pragma comment(lib, "Ws2_32.lib")
@@ -421,7 +422,7 @@ void close_extension(char* stateExtFilename) {
 		ebmlWriteElVInt(EL_hpil_outTcpPort, state_extensions.outTcpPort);
 		ebmlWriteElVInt(EL_hpil_inTcpPort, state_extensions.inTcpPort);
 		ebmlWriteElBool(EL_hpil_highSpeed, state_extensions.highSpeed);
-		ebmlWriteElBool(EL_hpil_medSpeed, state_extensions.highSpeed);
+		ebmlWriteElBool(EL_hpil_medSpeed, state_extensions.medSpeed);
 		ebmlWriteElBool(EL_hpil_pilBox, state_extensions.pilBox);
 		// internal HP-IL config
 		ebmlWriteElInt(EL_hpil_selected, hpil_settings.selected);
@@ -639,7 +640,7 @@ int shell_write_serial(int tx) {
 
 	if ((tx != 0x496) && (tx != 0x494) && (tx != 0x497)) {
 		//aff_frame(data,1);
-	}
+	} 
 	if ((tx & highframemsk) != _lastFrame) {
 		//Serial.print(" High part ");
 		//Serial.print(data & highframemsk, HEX);
