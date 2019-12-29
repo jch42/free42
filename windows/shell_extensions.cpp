@@ -35,7 +35,6 @@
 #include "core_ebml.h"
 #include "core_main.h"
 #include "hpil_common.h"
-#include "shell.h"
 #include "shell_extensions.h"
 
 #pragma comment(lib, "Ws2_32.lib")
