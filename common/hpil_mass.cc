@@ -2373,20 +2373,28 @@ static int hpil_readBuffer0_sub(int error) {
 				error = call_ilCompletion(hpil_wait_sub);
 				break;
 			case 1 :
+				ILCMD_TAD(hpil_settings.disk);
+				hpil_step++;
+				break;
+			case 2 :
 				ILCMD_DDT(0x00);
 				hpil_step++;
 				break;
-			case 2 :		// > ltn
+			case 3 :		// > ltn
 				ILCMD_ltn;
 				hpil_step++;
 				break;
-			case 3 :		// > send data
+			case 4 :		// > send data
 				hpilXCore.bufPtr = 0;
 				ILCMD_SDA;
 				hpil_step++;
 				break;
-			case 4 :		// > lun
+			case 5 :		// > lun
 				ILCMD_lun;
+				hpil_step++;
+				break;
+			case 6 :		// > UNT
+				ILCMD_UNT;
 				error = rtn_il_completion();
 				break;
 			default :
@@ -2425,6 +2433,10 @@ static int hpil_readBufferx_sub(int error) {
 				break;
 			case 4 :		// > lun
 				ILCMD_lun;
+				hpil_step++;
+				break;
+			case 5 :		// > UNT
+				ILCMD_UNT;
 				error = rtn_il_completion();
 				break;
 			default :
@@ -2517,6 +2529,10 @@ static int hpil_getMaxAddress_sub(int error) {
 				break;
 			case 3 :
 				ILCMD_lun;
+				hpil_step++;
+				break;
+			case 4 :		// > UNT
+				ILCMD_UNT;
 				error = rtn_il_completion();
 				break;
 			default :
@@ -2624,7 +2640,6 @@ static int hpil_getHeader_sub(int error) {
 				error = call_ilCompletion(hpil_getMaxAddress_sub);
 				break;
 			case 2 :		// > save recordsMax, LAD and seek to start of media
-				ILCMD_nop;
 				if (hpilXCore.bufPtr != 2) {
 					s.recordsMax = 0x01ff;		// assume 82161A tape drive...
 				}
@@ -2644,7 +2659,7 @@ static int hpil_getHeader_sub(int error) {
 				break;
 			case 4 :		// > transfer header block
 				hpilXCore.bufSize = ControllerAltBufSize;
-				ILCMD_nop;
+				ILCMD_TAD(hpil_settings.disk);;
 				hpil_step++;
 				error = call_ilCompletion(hpil_readBuffer0_sub);
 				break;

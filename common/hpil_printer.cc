@@ -527,7 +527,7 @@ int hpil_printerStatus() {
 	hpilXCore.buf = hpil_controllerAltBuf.data;
 	hpilXCore.bufPtr = 0;
 	hpilXCore.bufSize = 2;
-	ILCMD_ltn;
+	ILCMD_TAD(hpil_settings.print);
 	hpil_step = 0;
 	hpil_completion = hpil_printerStatus_completion;
 	// go
@@ -548,11 +548,15 @@ int hpil_printerStatus_completion(int error) {
 	if (error == ERR_NONE) {
 		error = ERR_INTERRUPTIBLE;
 		switch (hpil_step) {
-			case 0 :		// > SST
+			case 0:			// ltn
+				ILCMD_ltn;
+				hpil_step++;
+				break;
+			case 1 :		// > SST
 				ILCMD_SST;
 				hpil_step++;
 				break;
-			case 1 :
+			case 2 :
 				ILCMD_lun;
 				if (hpilXCore.bufPtr == 0) {
 					error = ERR_NO_RESPONSE;
@@ -560,6 +564,10 @@ int hpil_printerStatus_completion(int error) {
 				else {
 					hpil_step++;
 				}
+				break;
+			case 3 :		// > UNT
+				ILCMD_UNT;
+				hpil_step++;
 				break;
 			default :
 				error = ERR_NONE;

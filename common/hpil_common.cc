@@ -413,6 +413,10 @@ int hpil_aid_sub(int error) {
 				break;
 			case 2 :		// lun
 				ILCMD_lun;
+				hpil_step++;
+				break;
+			case 3 :		// UNT
+				ILCMD_UNT;
 				error = rtn_il_completion();
 				break;
 			default :
@@ -447,18 +451,22 @@ int hpil_wait_sub(int error) {
 					switch (hpilXCore.buf[0]) {
 						case 0x00 :		// Idle
 							ILCMD_lun;
-							error = rtn_il_completion();
+							hpil_step++;
 							break;
 						case 0x20:		// > Busy
 							ILCMD_nop;
-							hpil_step = 0;
+							hpil_step = 1;
 							break;
 						default:		// Anything else - same code as idle
 							ILCMD_lun;
-							error = rtn_il_completion();
+							hpil_step++;
 							break;
 					}
 				}
+				break;
+			case 3 :
+				ILCMD_UNT;
+				error = rtn_il_completion();
 				break;
 			default :
 				error = ERR_NONE;
