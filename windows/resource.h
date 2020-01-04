@@ -24,6 +24,8 @@
 #define IDD_STATE_NAME                          153
 #define IDD_HPILPREFS                           156
 #define IDR_STATES_MORE                         157
+#define IDI_HPIL                                159
+#define IDI_FREE42X                             161
 #define IDC_MATRIX_SINGULARMATRIX               1000
 #define IDC_MATRIX_OUTOFRANGE                   1001
 #define IDC_AUTO_REPEAT                         1002
@@ -39,11 +41,12 @@
 #define IDC_CALCULATOR_KEY                      1015
 #define IDC_WEBSITELINK                         1016
 #define IDC_FORUMLINK                           1017
-#define IDC_CURRENT                             1018
-#define IDC_STATES                              1019
-#define IDC_MORE                                1020
-#define IDC_STATE_PROMPT                        1021
-#define IDC_STATE_NAME                          1022
+#define IDC_EXTENSIONSWEBSITELINK               1018
+#define IDC_CURRENT                             1019
+#define IDC_STATES                              1020
+#define IDC_MORE                                1021
+#define IDC_STATE_PROMPT                        1022
+#define IDC_STATE_NAME                          1023
 #define IDM_SHOWPRINTOUT                        32771
 #define IDM_PAPERADVANCE                        32772
 #define IDM_PREFERENCES                         32773

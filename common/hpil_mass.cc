@@ -596,7 +596,7 @@ int docmd_wrtp(arg_struct *arg) {
 	s.saved_prgm = -1;
 	if (alphaSplit.len1 != 0) {
 		arg_s.type = TYPE_STRING;
-		arg_s.length = (alphaSplit.len1 > 6) ? 6 : alphaSplit.len1;
+		arg_s.length = (alphaSplit.len1 > 7) ? 7 : alphaSplit.len1;
 		for (i = 0; i < arg_s.length; i++) {
 			arg_s.val.text[i] = alphaSplit.str1[i];
 			s.fName[i] = alphaSplit.str1[i];

@@ -1290,6 +1290,7 @@ char *phloat2program(phloat d) {
      * shifts out of the mantissa.
      */
     decimal = -1;
+	zeroes = 0;
     exponent = -1;
     for (i = 0; i < scilen; i++) {
         char c = scibuf[i];

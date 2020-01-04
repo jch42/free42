@@ -1103,7 +1103,7 @@ static LRESULT CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPa
                 EndDialog(hDlg, id);
                 return TRUE;
             }
-            else if (id == IDC_WEBSITELINK || id == IDC_FORUMLINK)
+            else if (id == IDC_WEBSITELINK || id == IDC_FORUMLINK || id == IDC_EXTENSIONSWEBSITELINK)
             {
                 char buf[256];
                 GetDlgItemText(hDlg, id, buf, 255);
