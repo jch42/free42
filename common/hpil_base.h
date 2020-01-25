@@ -1,8 +1,8 @@
 /*****************************************************************************
  * Free42 -- an HP-42S calculator simulator
- * Copyright (C) 2004-2019  Thomas Okken
+ * Copyright (C) 2004-2020  Thomas Okken
  * Free42 eXtensions -- adding HP-IL to free42
- * Copyright (C) 2014-2019 Jean-Christophe HESSEMANN
+ * Copyright (C) 2014-2020 Jean-Christophe HESSEMANN
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License, version 2,
@@ -17,8 +17,8 @@
  * along with this program; if not, see http://www.gnu.org/licenses/.
  *****************************************************************************/
 
-#ifndef CORE_COMMANDS8_H
-#define CORE_COMMANDS8_H 1
+#ifndef HPIL_BASE_H
+#define HPIL_BASE_H 1
 
 #include "core_globals.h"
 
