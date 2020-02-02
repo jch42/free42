@@ -19,7 +19,7 @@
 #define CORE_MAIN_H 1
 
 #include "free42.h"
-
+#include "core_phloat.h"
 
 /**********************************/
 /* Shell/Core interface functions */
@@ -290,6 +290,21 @@ char *core_copy();
  * Used by the shell to implement the Paste command.
  */
 void core_paste(const char *s);
+ 
+/* parse_phloat
+ *
+ * convert a string to a phloat
+ * made available for other modules
+ */
+bool parse_phloat(const char *, int ,phloat *);
+
+/* parse_number_line
+ *
+ * parse a line to convert to a phloat
+ * made available for other modules
+ */
+
+phloat parse_number_line(char *buf);
 
 /* core_settings
  *
@@ -307,10 +322,12 @@ typedef struct {
     bool enable_ext_time;
     bool enable_ext_fptest;
     bool enable_ext_prog;
+	bool enable_ext_hpil;
 } core_settings_struct;
 
 extern core_settings_struct core_settings;
 
+extern int hp42ext[];
 
 /*******************/
 /* Keyboard repeat */

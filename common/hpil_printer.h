@@ -1,6 +1,8 @@
 /*****************************************************************************
  * Free42 -- an HP-42S calculator simulator
  * Copyright (C) 2004-2020  Thomas Okken
+ * Free42 eXtensions -- adding HP-IL to free42
+ * Copyright (C) 2014-2020 Jean-Christophe HESSEMANN
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License, version 2,
@@ -15,28 +17,11 @@
  * along with this program; if not, see http://www.gnu.org/licenses/.
  *****************************************************************************/
 
-#ifndef CORE_COMMANDS6_H
-#define CORE_COMMANDS6_H 1
+#ifndef HPIL_PRINTER_H
+#define HPIL_PRINTER_H 1
 
-#include "free42.h"
-#include "core_globals.h"
-
-int mappable_sin_r(phloat x, phloat *y);
-int docmd_sin(arg_struct *arg);
-int mappable_cos_r(phloat x, phloat *y);
-int docmd_cos(arg_struct *arg);
-int mappable_tan_r(phloat x, phloat *y);
-int docmd_tan(arg_struct *arg);
-int docmd_asin(arg_struct *arg);
-int docmd_acos(arg_struct *arg);
-int docmd_atan(arg_struct *arg);
-int docmd_log(arg_struct *arg);
-int docmd_10_pow_x(arg_struct *arg);
-int docmd_ln(arg_struct *arg);
-int docmd_e_pow_x(arg_struct *arg);
-int docmd_sqrt(arg_struct *arg);
-int docmd_square(arg_struct *arg);
-int docmd_inv(arg_struct *arg);
-int docmd_y_pow_x(arg_struct *arg);
+// commands
+void hpil_printText(const char *, int, int);
+void hpil_printLcd(const char *, int, int, int, int, int);
 
 #endif

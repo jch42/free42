@@ -1,6 +1,8 @@
 /*****************************************************************************
  * Free42 -- an HP-42S calculator simulator
  * Copyright (C) 2004-2020  Thomas Okken
+ * Free42 eXtensions -- adding HP-IL to free42
+ * Copyright (C) 2014-2020 Jean-Christophe HESSEMANN
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License, version 2,
@@ -65,6 +67,29 @@ extern FILE *gfile;
 #define ERR_NO_VARIABLES           31
 #define ERR_SUSPICIOUS_OFF         32
 #define ERR_RTN_STACK_FULL         33
+// hp-il special errors
+#define ERR_BROKEN_LOOP			   34
+#define ERR_BROKEN_IP			   35
+#define ERR_NO_RESPONSE			   36
+#define ERR_IL_ERROR			   37
+#define ERR_NO_DRIVE			   38
+#define ERR_BAD_MEDIA			   39
+#define ERR_DIR_FULL			   40
+#define ERR_MEDIA_FULL			   41
+#define ERR_FILE_DUP			   42
+#define ERR_FILE_NOT_FOUND		   43
+#define ERR_FILE_SECURED		   44
+#define ERR_FILE_EOF			   45
+#define ERR_FILE_BAD_TYPE		   46
+#define ERR_TRANSMIT_ERROR		   47
+#define ERR_BAD_CRC				   48
+#define ERR_NO_PRINTER			   49
+#define ERR_PRINTER_ERR			   50
+#define ERR_PLOTTER_INIT		   51
+#define ERR_NO_PLOTTER			   52
+#define ERR_PLOTTER_ERR			   53
+#define ERR_PLOTTER_DATA_ERR	   54
+#define ERR_PLOTTER_RANGE_ERR	   55
 
 typedef struct {
     const char *text;
@@ -267,6 +292,16 @@ typedef struct {
     char text[6];
 } vartype_string;
 
+/* one vartype to rule them all*/
+typedef union {
+    vartype *g;
+    vartype_real *r;
+    vartype_complex *c;
+    vartype_realmatrix *rm;
+    vartype_complexmatrix *cm;
+    vartype_string *s;
+} allvartypes_ptr;
+
 /******************/
 /* Emulator state */
 /******************/
@@ -300,7 +335,9 @@ typedef union {
         char f14;
         char trace_print; /* 'normal_print' ignored if this is set */
         char normal_print;
-        char f17; char f18; char f19; char f20;
+        char hpil_ina_err;	/* ina, end condition not found, fill up alpha buf */
+		char hpil_ina_eol;	/* ina, crlf condition Ok */
+		char f19; char f20;
         char printer_enable;
         char numeric_data_input;
         char alpha_data_input;
@@ -312,7 +349,8 @@ typedef union {
         char thousands_separators;
         char stack_lift_disable;
         char dmy; /* Time Module DMY mode */
-        char f32; char f33;
+        char manual_IO_mode;
+		char f33;
         char agraph_control1; /* 0 (default): dst = dst | src, 1: dst = src, */
         char agraph_control0; /* 2: dst = dst & ~src, 3: dst = dst ^ src */
         char digits_bit3;

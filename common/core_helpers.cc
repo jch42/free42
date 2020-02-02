@@ -25,6 +25,7 @@
 #include "core_main.h"
 #include "core_variables.h"
 #include "shell.h"
+#include "hpil_printer.h"
 
 
 int resolve_ind_arg(arg_struct *arg) {
@@ -596,6 +597,8 @@ void print_text(const char *text, int length, int left_justified) {
     }
 
     shell_print(buf, bufptr, bitmap, 18, 0, 0, 143, 9);
+	// patch for processing hpil printing
+	hpil_printText(text, length, left_justified);
 }
 
 void print_lines(const char *text, int length, int left_justified) {
@@ -1287,6 +1290,7 @@ char *phloat2program(phloat d) {
      * shifts out of the mantissa.
      */
     decimal = -1;
+	zeroes = 0;
     exponent = -1;
     for (i = 0; i < scilen; i++) {
         char c = scibuf[i];

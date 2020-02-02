@@ -1,6 +1,8 @@
 /*****************************************************************************
  * Free42 -- an HP-42S calculator simulator
  * Copyright (C) 2004-2020  Thomas Okken
+ * Free42 eXtensions -- adding HP-IL to free42
+ * Copyright (C) 2014-2020 Jean-Christophe HESSEMANN
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License, version 2,
@@ -27,6 +29,7 @@ bool unpersist_display(int version);
 void clear_display();
 void flush_display();
 void repaint_display();
+void scroll_display(int row, const char *s, int length);
 void draw_pixel(int x, int y);
 void draw_pattern(phloat dx, phloat dy, const char *pattern, int pattern_width);
 void fly_goose();

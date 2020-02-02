@@ -1,6 +1,8 @@
 /*****************************************************************************
  * Free42 -- an HP-42S calculator simulator
  * Copyright (C) 2004-2020  Thomas Okken
+ * Free42 eXtensions -- adding HP-IL to free42
+ * Copyright (C) 2014-2020 Jean-Christophe HESSEMANN
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License, version 2,
@@ -74,7 +76,29 @@ error_spec errors[] = {
     { /* INTERRUPTIBLE */          NULL,                       0 },
     { /* NO_VARIABLES */           "No Variables",            12 },
     { /* SUSPICIOUS_OFF */         "Suspicious OFF",          14 },
-    { /* RTN_STACK_FULL */         "RTN Stack Full",          14 }
+    { /* RTN_STACK_FULL */         "RTN Stack Full",          14 },
+	{ /* BROKEN LOOP */			   "Broken loop",			  11 },
+	{ /* BROKEN IP */			   "Broken virtual HPIL",	  19 },
+	{ /* DEVICE DO NOT RESPOND */  "No response",			  11 },
+	{ /* IL_INTERNAL_ERROR */	   "HP-IL internal error",	  20 },
+	{ /* NO DRIVE FOUND */		   "No drive",				   8 },
+	{ /* NOT A LIF Drive */		   "Bad media",				   9 },
+	{ /* DIR FULL */			   "Directory full",		  14 },
+	{ /* MEDIA FULL */			   "Media full",			  10 },
+	{ /* DUPL FILE */		       "Duplicated file name",	  20 },
+	{ /* FILE NOT FOUND */	       "File not found",		  14 },
+	{ /* FILE SECURED */	       "File secured",			  12 },
+	{ /* FILE EOF */			   "End of file",		      11 },
+	{ /* FILE BAD TYPE */		   "File type error",		  15 },
+	{ /* TRANSMIT ERROR */		   "Transmit error",		  14 },
+	{ /* BAD CRC */				   "CRC don't match",		  15 },
+	{ /* NO PRINTER */			   "No printer",			  10 },
+	{ /* PRINTER ERROR */		   "Printer error",			  13 },
+	{ /* PLEASE INIT PLOTTER */	   "Please init plotter",	  19 },
+	{ /* NO PLOTTER */			   "No plotter",			  10 },
+	{ /* PLOTTER ERROR */		   "Plotter error",			  13 },
+	{ /* PLOTTER DATA ERROR */	   "Plotter data error",	  18 },
+	{ /* PLOTTER RANGE ERROR */	   "Plotter range error",	  19 }
 };
 
 
@@ -3714,7 +3738,9 @@ void hard_reset(int reason) {
     flags.f.f14 = 0;
     flags.f.trace_print = 0;
     flags.f.normal_print = 0;
-    flags.f.f17 = flags.f.f18 = flags.f.f19 = flags.f.f20 = 0;
+    flags.f.hpil_ina_err = 0;
+	flags.f.hpil_ina_eol = 0;
+	flags.f.f19 = flags.f.f20 = 0;
     flags.f.printer_enable = 0;
     flags.f.numeric_data_input = 0;
     flags.f.alpha_data_input = 0;
@@ -3726,7 +3752,8 @@ void hard_reset(int reason) {
     flags.f.thousands_separators = 1;
     flags.f.stack_lift_disable = 0;
     flags.f.dmy = 0;
-    flags.f.f32 = flags.f.f33 = 0;
+    flags.f.manual_IO_mode = 0;
+	flags.f.f33 = 0;
     flags.f.agraph_control1 = 0;
     flags.f.agraph_control0 = 0;
     flags.f.digits_bit3 = 0;

@@ -1,6 +1,8 @@
 /*****************************************************************************
  * Free42 -- an HP-42S calculator simulator
  * Copyright (C) 2004-2020  Thomas Okken
+ * Free42 eXtensions -- adding HP-IL to free42
+ * Copyright (C) 2014-2020 Jean-Christophe HESSEMANN
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License, version 2,
@@ -27,6 +29,7 @@
 #include "core_variables.h"
 #include "shell.h"
 #include "shell_spool.h"
+#include "hpil_printer.h"
 
 
 /********************/
@@ -1093,7 +1096,7 @@ void tb_print_current_program(textbuf *tb) {
 void display_prgm_line(int row, int line_offset) {
     int4 tmppc = pc;
     int4 tmpline = pc2line(pc);
-    int cmd;
+    int cmd = 0;
     arg_struct arg;
     char buf[44];
     int bufptr;
@@ -1484,6 +1487,7 @@ static extension_struct extensions[] = {
     { CMD_ADATE,   CMD_SWPT,    &core_settings.enable_ext_time     },
     { CMD_FPTEST,  CMD_FPTEST,  &core_settings.enable_ext_fptest   },
     { CMD_LSTO,    CMD_BRESET,  &core_settings.enable_ext_prog     },
+    { CMD_IFC,     CMD_PRCL,    &core_settings.enable_ext_hpil      },
     { CMD_NULL,    CMD_NULL,    NULL                               }
 };
 
@@ -1499,6 +1503,7 @@ static int ext_fcn_cat[] = {
     CMD_LSTO, -1, CMD_WSIZE_T,
     CMD_ACCEL, CMD_LOCAT, CMD_HEADING,
     CMD_FPTEST,
+	CMD_IFC, -1, CMD_PRCL,
     CMD_NULL
 };
 
@@ -2191,6 +2196,7 @@ void redisplay() {
 
 void print_display() {
     shell_print(NULL, 0, display, 17, 0, 0, 131, 16);
+	hpil_printLcd(display, 17, 0, 0, 131, 16);
 }
 
 typedef struct {
@@ -2364,8 +2370,10 @@ int command2buf(char *buf, int len, int cmd, const arg_struct *arg) {
             || !core_settings.enable_ext_time && cmd >= CMD_ADATE && cmd <= CMD_SWPT
             || !core_settings.enable_ext_fptest && cmd == CMD_FPTEST
             || !core_settings.enable_ext_prog && cmd >= CMD_LSTO && cmd <= CMD_YMD
-            || (cmdlist(cmd)->hp42s_code & 0xfffff800) == 0x0000a000 && (cmdlist(cmd)->flags & FLAG_HIDDEN) != 0) {
+			|| !core_settings.enable_ext_hpil && cmd >= CMD_IFC && cmd <= CMD_PRCL
+            || (cmdlist(cmd)->hp42s_code & 0x0ffff800) == 0x0000a000 && (cmdlist(cmd)->flags & FLAG_HIDDEN) != 0) {
         xrom_arg = cmdlist(cmd)->hp42s_code;
+		xrom_arg &= 0x0fffffff;
         cmd = CMD_XROM;
     } else if (cmd == CMD_XROM)
         xrom_arg = arg->val.num;
@@ -2852,4 +2860,28 @@ void do_prgm_menu_key(int keynum) {
             return;
         }
     }
+}
+
+/* 
+ *
+ */
+void scroll_display(int row, const char *s, int length) {
+	int v;
+	int y0, y1;
+	if (row <0 || row >=2) {
+		return;
+	}
+	y0 = row == 1 ? 136 : 0;
+	y1 = row == 1 ? 0 : 136;
+	clear_row(row == 1 ? 0 : 1);
+	for (v = y1; v < y1 + 136; v++) {
+		display[v] = display[y0];
+		y0++;
+	}
+    mark_dirty(0, 0, 16, 131);
+	clear_row(row);
+    draw_string(0, row, s, length);
+    flags.f.message = 1;
+    flags.f.two_line_message = 1;
+	flush_display();
 }

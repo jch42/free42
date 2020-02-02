@@ -1,6 +1,8 @@
 /*****************************************************************************
  * Free42 -- an HP-42S calculator simulator
  * Copyright (C) 2004-2020  Thomas Okken
+ * Free42 eXtensions -- adding HP-IL to free42
+ * Copyright (C) 2014-2020 Jean-Christophe HESSEMANN
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License, version 2,
@@ -15,28 +17,20 @@
  * along with this program; if not, see http://www.gnu.org/licenses/.
  *****************************************************************************/
 
-#ifndef CORE_COMMANDS6_H
-#define CORE_COMMANDS6_H 1
+#ifndef HPIL_MASS_H
+#define HPIL_MASS_H 1
 
-#include "free42.h"
-#include "core_globals.h"
-
-int mappable_sin_r(phloat x, phloat *y);
-int docmd_sin(arg_struct *arg);
-int mappable_cos_r(phloat x, phloat *y);
-int docmd_cos(arg_struct *arg);
-int mappable_tan_r(phloat x, phloat *y);
-int docmd_tan(arg_struct *arg);
-int docmd_asin(arg_struct *arg);
-int docmd_acos(arg_struct *arg);
-int docmd_atan(arg_struct *arg);
-int docmd_log(arg_struct *arg);
-int docmd_10_pow_x(arg_struct *arg);
-int docmd_ln(arg_struct *arg);
-int docmd_e_pow_x(arg_struct *arg);
-int docmd_sqrt(arg_struct *arg);
-int docmd_square(arg_struct *arg);
-int docmd_inv(arg_struct *arg);
-int docmd_y_pow_x(arg_struct *arg);
-
+// commands
+int docmd_create(arg_struct *arg);
+int docmd_dir(arg_struct *arg);
+int docmd_newm(arg_struct *arg);
+int docmd_purge(arg_struct *arg);
+int docmd_readp(arg_struct *arg);
+int docmd_readr(arg_struct *arg);
+int docmd_rename(arg_struct *arg);
+int docmd_sec(arg_struct *arg);
+int docmd_unsec(arg_struct *arg);
+int docmd_wrtp(arg_struct *arg);
+int docmd_wrtr(arg_struct *arg);
+int docmd_zero(arg_struct * arg);
 #endif

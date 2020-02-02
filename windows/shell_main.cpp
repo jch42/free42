@@ -1,6 +1,8 @@
 /*****************************************************************************
  * Free42 -- an HP-42S calculator simulator
  * Copyright (C) 2004-2020  Thomas Okken
+ * Free42 eXtensions -- adding HP-IL to free42
+ * Copyright (C) 2014-2020 Jean-Christophe HESSEMANN
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License, version 2,
@@ -34,6 +36,7 @@
 #include "core_display.h"
 #include "msg2string.h"
 #include "StatesWindow.h"
+#include "shell_extensions.h"
 #include "shell_main.h"
 
 #include "VERSION.rc"
@@ -120,6 +123,7 @@ char free42dirname[FILENAMELEN];
 static char statefilename[FILENAMELEN];
 static FILE *statefile = NULL;
 static char printfilename[FILENAMELEN];
+static char extensionfilename[FILENAMELEN];
 
 static FILE *print_txt = NULL;
 static FILE *print_gif = NULL;
@@ -318,6 +322,7 @@ static BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
     sprintf(statefilename, "%s\\state.bin", free42dirname);
     sprintf(printfilename, "%s\\print.bin", free42dirname);
     sprintf(keymapfilename, "%s\\keymap.txt", free42dirname);
+    sprintf(extensionfilename, "%s\\state.ext", free42dirname);
 
     read_key_map(keymapfilename);
 
@@ -418,6 +423,8 @@ static BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
         return FALSE;
 
     core_init(init_mode, version, core_state_file_name, core_state_file_offset);
+
+	open_extension(extensionfilename);
 
     if (state.mainPlacementValid) {
         // Fix the size, in case the saved settings are not appropriate
@@ -578,6 +585,9 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT message, WPARAM wParam, LPAR
                 case IDM_PREFERENCES:
                     DialogBox(hInst, (LPCTSTR)IDD_PREFERENCES, hWnd, (DLGPROC)Preferences);
                     break;
+				case IDM_HPILPREFS:
+                    DialogBox(hInst, (LPCTSTR)IDD_HPILPREFS, hWnd, (DLGPROC)HpIlPrefs);
+					break;
                 case IDM_EXIT:
                     DestroyWindow(hWnd);
                     break;
@@ -1109,7 +1119,7 @@ static LRESULT CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPa
                 EndDialog(hDlg, id);
                 return TRUE;
             }
-            else if (id == IDC_WEBSITELINK || id == IDC_FORUMLINK)
+            else if (id == IDC_WEBSITELINK || id == IDC_FORUMLINK || id == IDC_EXTENSIONSWEBSITELINK)
             {
                 char buf[256];
                 GetDlgItemText(hDlg, id, buf, 255);
@@ -1605,6 +1615,8 @@ static void Quit() {
         shell_finish_gif(gif_seeker, gif_writer);
         fclose(print_gif);
     }
+
+	close_extension(extensionfilename);
 
     shell_spool_exit();
 }

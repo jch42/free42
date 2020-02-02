@@ -85,6 +85,11 @@ void core_init(int read_saved_state, int4 version, const char *state_file_name, 
     #else
         core_settings.enable_ext_fptest = false;
     #endif
+    #ifdef FREE42_HPIL
+        core_settings.enable_ext_hpil = true;
+    #else
+        core_settings.enable_ext_hpil = false;
+    #endif
     core_settings.enable_ext_time = true;
     core_settings.enable_ext_prog = true;
 
@@ -824,6 +829,8 @@ static void export_hp42s(int index) {
     do {
         get_next_command(&pc, &cmd, &arg, 0);
         hp42s_code = cmdlist(cmd)->hp42s_code;
+		// remove higher nibble
+		hp42s_code &= 0x0fffffff;	
         code_flags = hp42s_code >> 24;
         code_name = hp42s_code >> 16;
         code_std_1 = hp42s_code >> 8;
@@ -1095,6 +1102,8 @@ int4 core_program_size(int prgm_index) {
     do {
         get_next_command(&pc, &cmd, &arg, 0);
         hp42s_code = cmdlist(cmd)->hp42s_code;
+		// remove higher nibble
+		hp42s_code &= 0x0fffffff;	
         code_flags = hp42s_code >> 24;
         //code_name = hp42s_code >> 16;
         code_std_1 = hp42s_code >> 8;
@@ -1540,7 +1549,7 @@ static int hp42tofree42[] = {
     CMD_NULL  | 0x3000
 };
 
-static int hp42ext[] = {
+int hp42ext[] = {
     /* Flag values: 0 = string, 1 = IND string, 2 = suffix, 3 = special,
      * 4 = illegal */
     /* 80-8F */
@@ -1689,7 +1698,7 @@ static int hp42ext[] = {
 };
 
 
-static phloat parse_number_line(char *buf) {
+phloat parse_number_line(char *buf) {
     phloat res;
     if (buf[0] == 'E' || buf[0] == '-' && buf[1] == 'E') {
         char *buf2 = (char *) malloc(strlen(buf) + 2);
@@ -1878,7 +1887,8 @@ void core_import_programs(int num_progs, const char *raw_file_name) {
                     goto done;
                 code = (((unsigned int) byte1) << 8) | byte2;
                 for (i = 0; i < CMD_SENTINEL; i++)
-                    if (cmdlist(i)->hp42s_code == code) {
+					// mask higher nibble
+                    if ((cmdlist(i)->hp42s_code & 0x0fffffff) == code) {
                         if ((cmdlist(i)->flags & FLAG_HIDDEN) != 0)
                             break;
                         cmd = i;
@@ -2377,7 +2387,7 @@ static int scan_number(const char *buf, int len, int pos) {
     return len;
 }
 
-static bool parse_phloat(const char *p, int len, phloat *res) {
+bool parse_phloat(const char *p, int len, phloat *res) {
     // We can't pass the string on to string2phloat() unchanged, because
     // that function is picky: it does not allow '+' signs, and it does
     // not allow the mantissa to be more than 34 or 16 digits long (including
@@ -3921,7 +3931,8 @@ int find_builtin(const char *name, int namelen, bool strict) {
         if (i == CMD_HEADING && !core_settings.enable_ext_heading) i++;
         if (i == CMD_ADATE && !core_settings.enable_ext_time) i += 34;
         if (i == CMD_FPTEST && !core_settings.enable_ext_fptest) i++;
-        if (i == CMD_SST_UP && !core_settings.enable_ext_prog) i += 2;
+        if (i == CMD_LSTO && !core_settings.enable_ext_prog) i += 9;
+		if (i == CMD_IFC && !core_settings.enable_ext_hpil) i+= 80;
         if (i == CMD_SENTINEL)
             break;
         if ((cmdlist(i)->flags & FLAG_HIDDEN) != 0)
@@ -4272,6 +4283,7 @@ static void stop_interruptible() {
 }
 
 static int handle_error(int error) {
+int run = 0;
     if (mode_running) {
         if (error == ERR_RUN)
             error = ERR_NONE;
@@ -4343,6 +4355,7 @@ static int handle_error(int error) {
         return 0;
     } else {
         if (error == ERR_RUN) {
+			run = 1;
             set_running(true);
             error = ERR_NONE;
         }
@@ -4355,6 +4368,6 @@ static int handle_error(int error) {
         }
         if (error != ERR_NONE && error != ERR_STOP)
             display_error(error, 1);
-        return 0;
+        return run;
     }
 }
