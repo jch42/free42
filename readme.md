@@ -34,7 +34,7 @@ CLIPUU, CSIZE, CSIZEO, DGTIZE, DRAW, FRAME, GCLEAR, IDRAW, IMOVE, IPLOT, LABEL,
 LDIR, LIMIT, LOCATD, LOCATE, LORG, LTYPE, LTYPEO, LXAXIS, LYAXIS, MOVE, PCLBUF,
 PDIR, PEN, PENDN, PENUP, PINIT, PLOT, PLREGX, PRCL, RATIO, RPLOT, SCALE, SETGU, 
 SETUU, TICLEN, UNCLIP, WHERE, XAXIS, XAXISO, YAXIS, YAXISO.
-All other functions are user code and may be imported.
+All other functions are user code, see ./modules/NewPlot.raw.
 
 * Bonus functions
 - DSKSEL function to select the desired mass storage device.
