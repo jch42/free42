@@ -5,7 +5,7 @@
 #define IDD_ABOUTBOX                            103
 #define IDM_ABOUT                               105
 #define IDM_EXIT                                106
-#define IDI_FREE42                              108
+#define IDI_FREE42X                             108
 #define IDC_FREE42                              110
 #define IDD_PREFERENCES                         139
 #define IDD_SELECTPROGRAM                       140
@@ -25,7 +25,8 @@
 #define IDD_HPILPREFS                           156
 #define IDR_STATES_MORE                         157
 #define IDI_HPIL                                159
-#define IDI_FREE42X                             161
+#define IDI_FREE42                              161
+#define MAINICON                                164
 #define IDC_MATRIX_SINGULARMATRIX               1000
 #define IDC_MATRIX_OUTOFRANGE                   1001
 #define IDC_AUTO_REPEAT                         1002

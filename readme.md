@@ -1,0 +1,225 @@
+-------------------------------------------------------------------------------
+Free42 eXtensions is an attempt to add HP-IL capabilities to Free42.
+
+You may use virtual HP-IL devices such as ILPER from Jeff Garnier / Christoph
+Giesselink or pyilper from Joachim Siebold and even real ones with the PIL-Box
+from Jeff Garnier!
+
+some HP-IL functions already provided:
+
+* Printing:
+All HP-42S print functions are translated to HP-IL 82162A commands with some
+drawbacks with graphics support and PRLCD related to the printer model.
+
+* Mass storage:
+CREATE (screate), DIR (sdir), NEWM (snewm), PURGE, READP, READR, RENAME,
+SEC, UNSEC,WRTP (swrtp), WRTR (swrtr), ZERO.
+Commands operates as their 82160A HP-IL Module counterparts (or enhanced SKWID
+Extended IL Rom when noticed) with some tweaks: 
+- Spanning through multiple mass storage is not supported.
+- One-dimensionnal real matrices keep the HP-41C data type format.
+- Two data types added for single HP-42S objects and for multiple objects.
+
+* Interface control:
+82160A HP-IL Module - AUTOIO, MANIO, SELECT
+82183A Extended IO Module - AID, CLRDEV, CLRLOOP, ID, NLOOP, RCLSEL, STAT.
+
+* 82183A Extended IO Module data transfer functions:
+INAC, INACL, INAE, INAN, INXB,
+OUTAC, OUTACL, OUTAE, OUTAN, OUTXB,
+ANUMDEL, tweaked to allow complex numbers import.
+
+* 82184A Plotter Module:
+CLIPUU, CSIZE, CSIZEO, DGTIZE, DRAW, FRAME, GCLEAR, IDRAW, IMOVE, IPLOT, LABEL, 
+LDIR, LIMIT, LOCATD, LOCATE, LORG, LTYPE, LTYPEO, LXAXIS, LYAXIS, MOVE, PCLBUF,
+PDIR, PEN, PENDN, PENUP, PINIT, PLOT, PLREGX, PRCL, RATIO, RPLOT, SCALE, SETGU, 
+SETUU, TICLEN, UNCLIP, WHERE, XAXIS, XAXISO, YAXIS, YAXISO.
+All other functions are user code and may be imported.
+
+* Bonus functions
+- DSKSEL function to select the desired mass storage device.
+- IFC to reset loop controler
+- PRTSEL function to select the desired printer.
+- INACCL stop at specified character or CR/LF, usefull to deal with CSV files.
+
+
+-------------------------------------------------------------------------------
+Free42 is a software clone of the Hewlett-Packard 42S calculator. If you know
+how to use an HP-42S, you know how to use Free42.
+If you're new to the HP-42S and its clones, you may want to take a peek at the
+manual. You can find documentation at https://thomasokken.com/free42/#doc
+
+The remainder of this README file covers some miscellaneous tidbits that I had
+no other decent place to put.
+
+
+-------------------------------------------------------------------------------
+Binary vs. Decimal
+Starting with release 1.4, Free42 can be built with binary or with decimal
+floating point. Building the binary versions works as always (just say "make");
+to build the decimal versions, set the BCD_MATH environment variable, or use
+"make BCD_MATH=1".
+When switching between building the decimal and binary version (or vice versa),
+be sure to do "make clean", to avoid linking the wrong objects.
+When building the Windows version using Visual C++, choose the Free42Binary or
+Free42Decimal projects; these projects are set up so that all output files are
+written to separate directories (ReleaseBinary, ReleaseDecimal, DebugBinary,
+DebugDecimal), so you can switch between these projects without having to worry
+about cleaning up object files.
+
+
+-------------------------------------------------------------------------------
+Creating Free42 build environment in FreeBSD
+
+Create VirtualBox VM (using VirtualBox 5.2.22)
+Install FreeBSD-12.0-RELEASE-amd64-dvd1.iso
+
+then:
+
+pkg install gnome3
+pkg install xorg
+pkg install virtualbox-ose-additions
+
+in /etc/fstab, added:
+proc           /proc       procfs  rw  0   0
+
+in /etc/rc.conf, added:
+vboxguest_enable="YES"
+vboxservice_enable="YES"
+dbus_enable="YES"
+hald_enable="YES"
+gdm_enable="YES"
+gnome_enable="YES"
+
+That brings up the desktop.
+Now, some more stuff:
+
+pkg install devel/pkgconf
+pkg install devel/gmake
+
+
+-------------------------------------------------------------------------------
+About the character sets:
+('bigchars' and 'smallchars' arrays in core_display.c)
+
+The top half of the 256 character codes are like the bottom half,
+with these exceptions:
+0x80: thin colon (':') (looks different than regular colon),
+      while 0x00 is a calculator-style divide sign (superposition
+      of ':' and '-')
+0x81: small 'Y'; 0x01: multiply sign
+0x8a: displays 'LF' character (small 'L' and small 'F',
+      slightly offset, squeezed into one character cell);
+      0x0a: actual linefeed (move to next line of display).
+
+The bigchars array contains 130 characters, in 5x8 pixel cells,
+corresponding to codes 0-129. Char 10 is the 'LF' ligature.
+
+Note: the 'x:' and 'y:' legends for the standard X and Y register display
+are built from 0x78 (lowercase x), 0x81 (small 'Y'), and 0x80 (thin ':').
+Note: 0x01 (multiply) is different than 0x78 (lowercase x) (it is 1 pixel
+higher).
+
+
+-------------------------------------------------------------------------------
+HP-42S bugs that I found:
+
+If you activate the CUSTOM menu in KEYASN mode, go to its third row, and then
+switch to LCLBL mode, you get a menu row with labels "L", "M", "N", "O", "@",
+"XEQ"; these keys activate the commands XEQ ST Z, XEQ ST Y, XEQ ST X, XEQ ST L,
+XEQ 117, XEQ 118.
+These commands do actually work, but entering the corresponding labels into a
+program is a bit tricky...
+
+->POL and ->REC with a real number in X reject a string in Y (good), accept a
+real number in Y (good), accept a complex number in Y but only use its real
+part (undocumented and not very useful), and accept real and complex matrices
+in Y with weird results. I'd say the complex and matrix cases are all bugs,
+resulting from a missing parameter type check.
+
+If MATA, MATB, or MATX is the indexed matrix, and SIMQ resizes it to a smaller
+size, IJ aren't set to (1, 1) as they usually are when the indexed matrix is
+resized (though DIM or SIZE). As a result, IJ can end up pointing outside the
+allocated elements, and RCLEL and STOEL can then produce wacky results.
+
+HP-42S bugs that others have found:
+
+When COMB or PERM are invoked with bad arguments (e.g. X > Y), "Invalid Data"
+is returned (good), but all subsequent invocations of those two functions also
+yield that message, even if the parameters are now correct (bad). This
+condition can be cleared up by performing an operation that affects LASTx (but
+not STO ST L). Apparently some rev. B models do not have this bug; I have read
+that the original problem was a hardware bug, for which rev. B introduced a
+software workaround; somewhere in the rev. B production run the hardware bug
+was fixed, but now the software workaround would *cause* the bug. The bug also
+exists in all rev. C models, apparently (it does in mine, and in Emu42 when run
+with a rev. C ROM!).
+I'm curious as to why a couple of basic, straightforward instructions like COMB
+and PERM would be sensitive to a hardware bug (and *only* they, apparently),
+but who am I to question what I've heard others report? I'm not about to spend
+weeks poring over ROM disassemblies to make sure...
+
+In LINΣ mode, summing a matrix is buggy. I have seen it sum only the first row,
+and report a bogus value back in X (8.47216900137e-489), and also seen it say
+Insufficient Memory when that clearly wasn't true; I have heard a report from
+someone else about the machine even locking up to the point where it needs a
+hard reset.
+
+In some versions, in LINΣ mode, Σ+ and Σ- do not update LASTx. I read about
+this in a manual addendum from HP; however, I cannot reproduce this, neither on
+my real HP-42S nor on Emu42 (both rev. C ROM).
+
+I have also heard a report that FCSTX is buggy in PWRF mode; I have not been
+able to confirm this yet but there appears to be more I have to read about it.
+Probably depends on your ROM version; I tested with rev. C but it seemed fine.
+
+Not sure if this is a bug or not:
+
+When KEYX or KEYG are used to reprogram the ▲ and ▼ keys, it would be nice if
+the user would be alerted to this by the ▼▲ annunciator in the display turning
+on. The manual does not mention this behavior, but older editions of the
+Programming Examples and Techniques book do (page 34, bottom). It doesn't work
+on the actual calculator, at least not on any that I've heard of.
+Free42 does turn on the ▼▲ annunciator. Although my general rule is to mimic
+the HP-42S as closely as possible, I felt that this was a nice feature and that
+it's pretty unlikely to break anything. :-)
+
+
+-------------------------------------------------------------------------------
+[MIN], [MAX], and [FIND]: undocumented HP-42S matrix functions
+
+[MIN] finds the lowest element of the current column, starting at the current
+row, of the indexed matrix, and returns the element to X and the row where it
+was found to Y; [MAX] is like [MIN] except it finds the highest element; if the
+minimum or maximum is not unique (it is found in more than one row), the
+highest matching row is returned. [MIN] and [MAX] require the indexed matrix to
+be a real matrix, and they do not allow string elements in the column being
+searched.
+
+[FIND] locates a specific value, searching the indexed matrix left to right and
+top to bottom. The function works as a conditional: when a program is running,
+the following instruction is executed if a match is found, and skipped if a
+match is not found; when executed interactively, the display shows "Yes" if a
+match is found and "No" if not.
+Also, if a match is found, I and J are set to point to it.
+The indexed matrix may be real or complex, and the search value may be real,
+complex, or string; real or string values are only found in real matrices, and
+complex values are only found in complex matrices; in other words, 5 is not
+considered equal to 5 + 0i -- mathematically speaking this is wrong, but on the
+other hand it is consistent with the behavior of the X=Y? and X≠Y? functions.
+
+
+-------------------------------------------------------------------------------
+Differences between the Free42 printer emulation and the HP-42S/82240
+
+Free42 prints programs differently in NORM or TRACE modes: in NORM mode, the
+listing is right-justified, and in TRACE mode, the listing is compact (multiple
+commands per line). The HP42S does not do this; Free42 "inherited" this
+behavior from the HP-82143 printer, which the author remembers fondly. :-)
+
+When the HP-42S has to print a line that is too long to fit on one physical
+printer line (i.e., more than 24 characters), it takes no special action.
+Whether the printer prints the overflow left- or right-justified remains to be
+found out. I should check the 82240 specs to see how it behaves.
+Free42 usually prints the overflow left-justified; the only exceptions are PRP
+and LIST in NORM mode.
