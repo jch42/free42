@@ -97,7 +97,6 @@ int call_ilCompletion(int (*hpil_completion_call)(int));
 int rtn_il_completion();
 
 int hpil_aid_sub(int error);
-int hpil_wait_sub(int error);
 
 int hpil_display_sub(int error);
 int hpil_pause_sub(int error);

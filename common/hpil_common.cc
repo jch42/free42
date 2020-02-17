@@ -426,55 +426,6 @@ int hpil_aid_sub(int error) {
 	return error;
 }
 
-/* wait for status not busy
- *
- * wait till status is no more busy
- */
-int hpil_wait_sub(int error) {
-	if (error == ERR_NONE) {
-		error = ERR_INTERRUPTIBLE;
-		switch (hpil_step) {
-			case 0 :		// > buffer clear & ltn
-				hpilXCore.bufPtr = 0;
-				ILCMD_ltn;
-				hpil_step++;
-				break;
-			case 1 :		// > SST
-				ILCMD_SST;
-				hpil_step++;
-				break;
-			case 2 :		// > Status interpretation
-				if (hpilXCore.bufPtr == 0) {
-					error = ERR_NO_RESPONSE;
-				}
-				else {
-					switch (hpilXCore.buf[0]) {
-						case 0x00 :		// Idle
-							ILCMD_lun;
-							hpil_step++;
-							break;
-						case 0x20:		// > Busy
-							ILCMD_nop;
-							hpil_step = 1;
-							break;
-						default:		// Anything else - same code as idle
-							ILCMD_lun;
-							hpil_step++;
-							break;
-					}
-				}
-				break;
-			case 3 :
-				ILCMD_UNT;
-				error = rtn_il_completion();
-				break;
-			default :
-				error = ERR_NONE;
-		}
-	}
-	return error;
-}
-
 /* hpil_Display
  *
  * display / print
