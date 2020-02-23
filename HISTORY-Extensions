@@ -1,0 +1,5 @@
+2002-02-16: Free42 eXtensions 1.1
+
+* Only for Windows, yet.
+* Resumption of my old Free42X project with much less changes to the original
+  code and using separate status and configuration files to avoid conflicts.
