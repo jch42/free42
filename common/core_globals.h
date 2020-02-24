@@ -68,28 +68,30 @@ extern FILE *gfile;
 #define ERR_SUSPICIOUS_OFF         32
 #define ERR_RTN_STACK_FULL         33
 // hp-il special errors
-#define ERR_BROKEN_LOOP			   34
-#define ERR_BROKEN_IP			   35
-#define ERR_NO_RESPONSE			   36
-#define ERR_IL_ERROR			   37
-#define ERR_NO_DRIVE			   38
-#define ERR_BAD_MEDIA			   39
-#define ERR_DIR_FULL			   40
-#define ERR_MEDIA_FULL			   41
-#define ERR_FILE_DUP			   42
-#define ERR_FILE_NOT_FOUND		   43
-#define ERR_FILE_SECURED		   44
-#define ERR_FILE_EOF			   45
-#define ERR_FILE_BAD_TYPE		   46
-#define ERR_TRANSMIT_ERROR		   47
-#define ERR_BAD_CRC				   48
-#define ERR_NO_PRINTER			   49
-#define ERR_PRINTER_ERR			   50
-#define ERR_PLOTTER_INIT		   51
-#define ERR_NO_PLOTTER			   52
-#define ERR_PLOTTER_ERR			   53
-#define ERR_PLOTTER_DATA_ERR	   54
-#define ERR_PLOTTER_RANGE_ERR	   55
+#define ERR_BROKEN_LOOP            34
+#define ERR_BROKEN_IP              35
+#define ERR_NO_RESPONSE            36
+#define ERR_IL_ERROR               37
+#define ERR_NO_DRIVE               38
+#define ERR_NO_MEDIA               39
+#define ERR_WRT_ONLY               40
+#define ERR_BAD_MEDIA              41
+#define ERR_DIR_FULL               42
+#define ERR_MEDIA_FULL             43
+#define ERR_FILE_DUP               44
+#define ERR_FILE_NOT_FOUND         45
+#define ERR_FILE_SECURED           46
+#define ERR_FILE_EOF               47
+#define ERR_FILE_BAD_TYPE          48
+#define ERR_TRANSMIT_ERROR         49
+#define ERR_BAD_CRC                50
+#define ERR_NO_PRINTER             51
+#define ERR_PRINTER_ERR            52
+#define ERR_PLOTTER_INIT           53
+#define ERR_NO_PLOTTER             54
+#define ERR_PLOTTER_ERR            55
+#define ERR_PLOTTER_DATA_ERR       56
+#define ERR_PLOTTER_RANGE_ERR      57
 
 typedef struct {
     const char *text;
@@ -335,9 +337,9 @@ typedef union {
         char f14;
         char trace_print; /* 'normal_print' ignored if this is set */
         char normal_print;
-        char hpil_ina_err;	/* ina, end condition not found, fill up alpha buf */
-		char hpil_ina_eol;	/* ina, crlf condition Ok */
-		char f19; char f20;
+        char hpil_ina_err;  /* ina, end condition not found, fill up alpha buf */
+        char hpil_ina_eol;  /* ina, crlf condition Ok */
+        char f19; char f20;
         char printer_enable;
         char numeric_data_input;
         char alpha_data_input;
@@ -350,7 +352,7 @@ typedef union {
         char stack_lift_disable;
         char dmy; /* Time Module DMY mode */
         char manual_IO_mode;
-		char f33;
+        char f33;
         char agraph_control1; /* 0 (default): dst = dst | src, 1: dst = src, */
         char agraph_control0; /* 2: dst = dst & ~src, 3: dst = dst ^ src */
         char digits_bit3;

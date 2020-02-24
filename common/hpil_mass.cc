@@ -136,7 +136,7 @@ struct MassStorage {
 	char fAttrMask;				// same, for reset
 	int fLength;				// file length
 	int fBlocks;				// file size in blocks
-	int cmdType;				// create / write / read /purge /ssek
+	int cmdType;				// create / write / read / purge / seek
 	int pBlocks;				// processed blocks
 	// what to do
 	void (*hpil_processBuffer)(void);
@@ -2725,6 +2725,24 @@ static int hpil_wait_sub(int error) {
 						case 0x00 :		// Idle
 							ILCMD_lun;
 							hpil_step++;
+							break;
+						case 0x14:		// no media
+							error = ERR_NO_MEDIA;
+							break;
+						case 0x0f:		// stall
+						case 0x19:		// record number error
+						case 0x1a:		// checksum error
+						case 0x1c:		// size error
+							error = ERR_BAD_MEDIA;
+							break;
+						case 0x1d:		// write protect
+							if (s.cmdType & (TypeCreate | TypeWrite | TypeUpdate | TypePurge | TypeRename | TypeZero | TypePartial)) {
+								error = ERR_WRT_ONLY;
+							}
+							else {
+								ILCMD_lun;
+								hpil_step++;
+							}
 							break;
 						case 0x20:		// > Busy
 							ILCMD_nop;

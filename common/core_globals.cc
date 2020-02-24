@@ -82,6 +82,8 @@ error_spec errors[] = {
 	{ /* DEVICE DO NOT RESPOND */  "No response",			  11 },
 	{ /* IL_INTERNAL_ERROR */	   "HP-IL internal error",	  20 },
 	{ /* NO DRIVE FOUND */		   "No drive",				   8 },
+	{ /* NO MEDIUM */		       "No media",				   8 },
+	{ /* WRITE PROTECT */		   "Write Protect",			  13 },
 	{ /* NOT A LIF Drive */		   "Bad media",				   9 },
 	{ /* DIR FULL */			   "Directory full",		  14 },
 	{ /* MEDIA FULL */			   "Media full",			  10 },
