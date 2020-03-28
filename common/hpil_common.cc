@@ -166,7 +166,7 @@ int hpil_check() {
 int hpil_worker(int interrupted) {
 	int err = ERR_INTERRUPTIBLE;
 	// debug...
-	//char s[100];
+	char s[100];
 
 	if (interrupted) {
         err = ERR_STOP;
@@ -192,6 +192,7 @@ int hpil_worker(int interrupted) {
 			if (!(controllerCommand & tlk)) {
 				// simulate hshk for local commands
 				hpil_core.pseudoSet(hshk);
+				shell_log("set hshk");
 			}
 		}
 		else {
@@ -279,17 +280,25 @@ int hpil_worker(int interrupted) {
 	}
 	// check end of current command
 	if (hpil_core.pseudoTcl(hshk)){
+		shell_log("test and clear hshk");
 		hpilXCore.statusFlags &= ~CmdRun;
 		hpilXCore.statusFlags |= CmdHshk;
 		if (hpil_completion) {
+			sprintf(s,"hpil_completion %08x",hpil_completion);
+			shell_log(s);
 			err = hpil_completion(ERR_NONE);
 		}
 		else {
 			err = ERR_NONE;
+			shell_log("err_none");
 		}
+	}
+	else {
+		shell_log("Another run for hshk");
 	}
 	if (loopTimeout == 0) {
 		err = ERR_BROKEN_LOOP;
+		shell_log("Broken loop");
 	}
 	if (err == ERR_NONE || err == ERR_INTERRUPTIBLE || err == ERR_RUN) {
 		// check buffers level and process

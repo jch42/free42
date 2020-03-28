@@ -173,7 +173,7 @@ protected:
 #define ccmd	0x02000000
 #define srdy	0x04000000
 #define rtl		0x08000000
-// special variable rfc hanshake completed
+// special variable rfc handshake completed
 #define hshk	0x40000000
 
 /*
@@ -372,6 +372,7 @@ protected:
 #define SCSS		0x0005		// intermediate state (Rfc auto)
 #define SCHS		0x0006		// Source Command Handshake State
 // state testing
+#define sids() (S_State == SIDS)
 #define sgns() (S_State == SGNS)
 #define sdys() (S_State == SDYS)
 #define strs() (S_State == STRS)

@@ -97,11 +97,11 @@ void HPIL_Core::beginCore(void)
 
 uint8_t HPIL_Core::process(void)
 {
-char buf[100] = "";
+char buf[140] = "";
 char opt[5] = "Std ";
 	StateChanged = 0;
-	//tprintf(buf,"\n{Input %04x, %s, %s, %s, %s, %s, %s , %s, %s , pseudo %08x, chng %01x, %s} ",cycles,R_ist[R_State],D_ist[D_State],A_ist[A_State],S_ist[S_State],C_ist[C_State],T_ist[T_State],L_ist[L_State],AA_ist[AA_State],_pseudoMsg,StateChanged,opt);
-	//shell_write_console(buf);
+	sprintf(buf,"{Input      , %04x, %s, %s, %s, %s, %s, %s , %s, %s, %s , pseudo %08x} "                      ,_hpil,R_ist[R_State],D_ist[D_State],A_ist[A_State],S_ist[S_State],C_ist[C_State],T_ist[T_State],L_ist[L_State],AA_ist[AA_State],NR_ist[NR_State],_pseudoMsg);
+	shell_log(buf);
 	if ((!(debugLevel & DebugMonitorNoFast)) && (dab() && lacs() && dids() && !(nens() && Pseudo_Tst(hlt)) && !Pseudo_Tst(rsv))) {
 		// DOE Lacs optimized cycle
 		strcpy(opt, "LACS"); 
@@ -150,13 +150,9 @@ char opt[5] = "Std ";
 		Do_DT_State();
 		Do_DD_State();
 	}
-	/*
-	if (StateChanged && (debugLevel & DebugMonitorStates)) {
-		cycles++;
-		tprintf(buf,"\n{Cycle# %04x, %s, %s, %s, %s, %s, %s , %s, %s , pseudo %08x, chng %01x, %s} ",cycles,R_ist[R_State],D_ist[D_State],A_ist[A_State],S_ist[S_State],C_ist[C_State],T_ist[T_State],L_ist[L_State],AA_ist[AA_State],_pseudoMsg,StateChanged,opt);
-		shell_log(buf);
-	}
-	*/
+	cycles++;
+	sprintf(buf,"{Cycle# %04x, %04x, %s, %s, %s, %s, %s, %s , %s, %s, %s, pseudo %08x, chng %01x, %s} ",cycles,_hpil,R_ist[R_State],D_ist[D_State],A_ist[A_State],S_ist[S_State],C_ist[C_State],T_ist[T_State],L_ist[L_State],AA_ist[AA_State],NR_ist[NR_State],_pseudoMsg,StateChanged,opt);
+	shell_log(buf);
 	return (StateChanged);
 }
 
@@ -193,7 +189,7 @@ uint8_t hold;
 					|| (aad() && (aaus() || cacs()));	// add cacs to hold aad when controler
 				if (echo && hold) {
 					// debug
-					//shell_write_console("Echo / Hold conflicts !!!");
+					shell_log("Echo / Hold conflicts !!!");
 				}
 				if (echo && !dtrs()) {
 					R_State = RITS;
@@ -301,6 +297,8 @@ uint8_t norepeat;
 				norepeat=(doe() && (tacs() || spas() || dias() || aias() || tahs() || ters()))
 					|| cmd() || idy() || aag()
 					|| (rdy() && !nrd() && (cacs() || csbs()))
+					// add detection for last frame send when controler
+					|| (sids() && Pseudo_Tst(scl) && Pseudo_Tcl(lfs) && (cacs() || csbs()))
 					|| (sot() && (tads() || tacs() || spas() || dias() || aias() || tahs() || ters()))
 					|| (nrd() && cacs());
 				// troubleshooting
@@ -466,6 +464,7 @@ uint16_t tmp;
 					S_State = STRS;
 					StateChanged = 1;
 					Pseudo_Clr(hshk);
+					shell_log("clear hshk");
 					Pseudo_Clr(nfa);
 				}
 				break;
@@ -496,6 +495,7 @@ uint16_t tmp;
 					// IDY / RDY, set handshake
 					else {
 						Pseudo_Set(hshk);
+						shell_log("set hshk");
 					}
 				}
 				if (!source) {
@@ -558,6 +558,14 @@ void HPIL_Core::Do_C_State(void)
 					C_State = CACS;
 					StateChanged = 1;
 					Pseudo_Set(hshk);
+					shell_log("set hshk");
+				}
+				// add test to detect end of transmission when controler
+				else if (sids() && Pseudo_Tst(scl) && Pseudo_Tst(lfs)) {
+					C_State = CACS;
+					StateChanged = 1;
+					Pseudo_Set(hshk);
+					shell_log("set hshk");
 				}
 				break;
 			case CTRS :
@@ -681,17 +689,22 @@ void HPIL_Core::Do_T_State(void)
 					_internalFrame = _ETE_Val;
 					Pseudo_Set(icmd);
 				}
-				if (Pseudo_Tcl(lfs) || (nrd() && acds())) {
+				if (Pseudo_Tst(lfs) || (nrd() && acds())) {
+					// ETO should not be issued when acting as controller
+					if (!Pseudo_Tst(scl)) {
+						Pseudo_Clr(lfs);
+						_internalFrame = _ETO_Val;
+						Pseudo_Set(icmd);
+					}
 					T_State = TAHS;
 					StateChanged = 1;
-					_internalFrame = _ETO_Val;
-					Pseudo_Set(icmd);
 				}
 				break;
 			case TAHS :
-				if (eto() && strs()) {
+				if ((eto() && strs()) || (Pseudo_Tst(lfs) && acds())) {
 					T_State = TADS;
 					StateChanged = 1;
+					shell_log("TAHS->TADS");
 				}
 				break;
 			case TERS :
@@ -1120,24 +1133,32 @@ void HPIL_Core::Do_DD_State(void)
 
 void HPIL_Core::frameRx(uint16_t rx)
 {
+char buf[16];
 	Pseudo_Set(edge | sync);
 	_hpil = rx;
+	sprintf(buf,"framerx %03x", rx);
+	shell_log(buf);
 }
 
 uint16_t HPIL_Core::frameTx(void)
 {
 unsigned int tx = -1;
+char buf[16];
 	if (!Pseudo_Tst(frtc)) {
 		if (dacs() || dscs() || dtrs()) {
 			Pseudo_Set(frtc);
 			tx = _hpil;
+			sprintf(buf,"frametx %03x", tx);
+			shell_log(buf);
 		}
 		else {
 			// HP_IL serial out inactivated by driver state machine
+			shell_log("HP_IL serial out inactivated by driver state machine");
 		}
 	}
 	else {
 		// HP_IL serial out error, output frame overrun
+		shell_log("HP_IL serial out error, output frame overrun");
 	}
 	return(tx);
 }
