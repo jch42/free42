@@ -122,7 +122,9 @@ void hpil_printText(const char *text, int length, int left_justified) {
 	int i = 0, j = 0;
 	int statusUpdate;
 	bool eightBitsMode = false;
-
+	if (hpil_settings.prtAid == -1) {
+		return;
+	}
 	if (hpil_check() != ERR_NONE)
         return;
 	if (hpil_printerSelect() != ERR_NONE)
@@ -219,6 +221,9 @@ void hpil_printLcd(const char *bits, int bytesperline, int x, int y, int width, 
 	int xx,yy;
 	char c;
 
+	if (hpil_settings.prtAid == -1) {
+		return;
+	}
 	if (hpil_check() != ERR_NONE)
         return;
 	if (hpil_printerSelect() != ERR_NONE)
@@ -415,7 +420,6 @@ int hpil_printerSelect() {
 	int (*save_hpil_completion)(int);
 	int save_hpil_step;
 	int save_hpil_sp;
-
 	// backup current hpil_state
 	save_hpil_completion = hpil_completion;
 	save_hpil_step = hpil_step;
@@ -430,13 +434,11 @@ int hpil_printerSelect() {
 	do {
 		error = hpil_worker(ERR_NONE);
 	} while (error == ERR_INTERRUPTIBLE);
-
 	// restore hpil_state
 	hpil_completion = save_hpil_completion;
 	hpil_step = save_hpil_step;
 	hpil_sp = save_hpil_sp;
 	hpil_settings.modeTransparent = false;
-
 	return error;
 }
 

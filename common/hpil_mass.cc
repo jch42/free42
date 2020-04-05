@@ -32,7 +32,6 @@
 #include "hpil_controller.h"
 #include "hpil_mass.h"
 
-
 #if defined (__ANDROID__)
 
 uint16_t _byteswap_ushort(uint16_t x) {
@@ -2716,14 +2715,18 @@ static int hpil_wait_sub(int error) {
 				ILCMD_SST;
 				hpil_step++;
 				break;
-			case 2 :		// > Status interpretation
+			case 2 :		// > Status interpretation moved to next step, but always do lun
+				ILCMD_lun;
+				hpil_step++;
+				break;
+			case 3 :		// > Status post - interpretation moved there
 				if (hpilXCore.bufPtr == 0) {
 					error = ERR_NO_RESPONSE;
 				}
 				else {
 					switch (hpilXCore.buf[0]) {
 						case 0x00 :		// Idle
-							ILCMD_lun;
+							ILCMD_UNT;
 							hpil_step++;
 							break;
 						case 0x14:		// no media
@@ -2740,28 +2743,23 @@ static int hpil_wait_sub(int error) {
 								error = ERR_WRT_ONLY;
 							}
 							else {
-								ILCMD_lun;
+								ILCMD_UNT;
 								hpil_step++;
 							}
 							break;
-						case 0x20:		// > Busy
-							ILCMD_nop;
-							hpil_step = 4;
+						case 0x20:		// > Busy, loop
+							ILCMD_TAD(hpil_settings.disk);
+							hpil_step = 0;
 							break;
 						default:		// Anything else - same code as idle
-							ILCMD_lun;
+							ILCMD_UNT;
 							hpil_step++;
-							break;
 					}
 				}
 				break;
-			case 3 :
-				ILCMD_UNT;
+			case 4 :		// done
+				ILCMD_nop;
 				error = rtn_il_completion();
-				break;
-			case 4 :		// loop again
-				ILCMD_TAD(hpil_settings.disk);
-				hpil_step = 0;
 				break;
 			default :
 				error = ERR_NONE;

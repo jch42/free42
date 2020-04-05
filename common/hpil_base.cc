@@ -97,7 +97,7 @@ int docmd_prtsel(arg_struct *arg) {
         return ERR_NONEXISTENT;
 	if (hpilXCore.statusFlags & (CmdNew | CmdRun))
 		return ERR_RESTRICTED_OPERATION;
-	return mappable_x_hpil(31,&hpil_settings.prtAid);
+	return mappable_device_hpil(31,&hpil_settings.prtAid);
 }
 
 int docmd_dsksel(arg_struct *arg) {

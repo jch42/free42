@@ -166,8 +166,7 @@ int hpil_check() {
 int hpil_worker(int interrupted) {
 	int err = ERR_INTERRUPTIBLE;
 	// debug...
-	char s[100];
-
+	//char s[100];
 	if (interrupted) {
         err = ERR_STOP;
 	}
@@ -183,29 +182,33 @@ int hpil_worker(int interrupted) {
 			if (hpil_completion) {
 				err =  hpil_completion(ERR_NONE);
 			}
-		}
-		else if (controllerCommand & Local) {
-			// local controller command
-			hpilXCore.statusFlags &= ~CmdNew;
-			hpilXCore.statusFlags |= CmdRun;
-			hpil_core.pseudoSet(controllerCommand & ~Local);
-			if (!(controllerCommand & tlk)) {
-				// simulate hshk for local commands
+			else {
 				hpil_core.pseudoSet(hshk);
-				shell_log("set hshk");
 			}
 		}
 		else {
-			// anything else
-			hpilXCore.statusFlags &= ~CmdNew;
-			hpilXCore.statusFlags |= CmdRun;
-			hpil_core.controllerCmd(controllerCommand);
-		}
-		while (hpil_core.process()) {
-			if (hpil_core.pseudoTcl(outf)) {
-				frame = hpil_core.frameTx();
-				if (hpil_write_frame() != ERR_NONE) {
-					err = ERR_BROKEN_IP;
+			if (controllerCommand & Local) {
+				// local controller command
+				hpilXCore.statusFlags &= ~CmdNew;
+				hpilXCore.statusFlags |= CmdRun;
+				hpil_core.pseudoSet(controllerCommand & ~Local);
+				if (!(controllerCommand & tlk)) {
+					// simulate hshk for local commands
+					hpil_core.pseudoSet(hshk);
+				}
+			}
+			else {
+				// anything else
+				hpilXCore.statusFlags &= ~CmdNew;
+				hpilXCore.statusFlags |= CmdRun;
+				hpil_core.controllerCmd(controllerCommand);
+			}
+			while (hpil_core.process()) {
+				if (hpil_core.pseudoTcl(outf)) {
+					frame = hpil_core.frameTx();
+					if (hpil_write_frame() != ERR_NONE) {
+						err = ERR_BROKEN_IP;
+					}
 				}
 			}
 		}
@@ -252,8 +255,6 @@ int hpil_worker(int interrupted) {
 	}
 	// Receiving message ?
 	else if (shell_read_frame(&frame)) {
-		//sprintf(s,"Rx  %06X\n",frame);
-		//shell_write_console(s);
 		hpil_core.frameRx((uint16_t)frame);
 		while (hpil_core.process()) {
 			if (hpil_core.pseudoTcl(outf)) {
@@ -265,11 +266,8 @@ int hpil_worker(int interrupted) {
 		}
 	}
 	else {
-		//shell_write_console("Loop\n");
 		loopTimeout--;
 		while (hpil_core.process()) {
-			//shell_write_console("Active\n");
-
 			if (hpil_core.pseudoTcl(outf)) {
 				frame = hpil_core.frameTx();
 				if (hpil_write_frame() != ERR_NONE) {
@@ -280,25 +278,17 @@ int hpil_worker(int interrupted) {
 	}
 	// check end of current command
 	if (hpil_core.pseudoTcl(hshk)){
-		shell_log("test and clear hshk");
 		hpilXCore.statusFlags &= ~CmdRun;
 		hpilXCore.statusFlags |= CmdHshk;
 		if (hpil_completion) {
-			sprintf(s,"hpil_completion %08x",hpil_completion);
-			shell_log(s);
 			err = hpil_completion(ERR_NONE);
 		}
 		else {
 			err = ERR_NONE;
-			shell_log("err_none");
 		}
-	}
-	else {
-		shell_log("Another run for hshk");
 	}
 	if (loopTimeout == 0) {
 		err = ERR_BROKEN_LOOP;
-		shell_log("Broken loop");
 	}
 	if (err == ERR_NONE || err == ERR_INTERRUPTIBLE || err == ERR_RUN) {
 		// check buffers level and process
@@ -324,6 +314,9 @@ int hpil_worker(int interrupted) {
 				hpilXCore.statusFlags &= ~RunAgainTalkBuf;
 			}
 		}
+	}
+	else if (err == ERR_NO_PRINTER) {
+		// nothing to do
 	}
 	else if (hpil_settings.modeTransparent) {
 		hpil_restart();
@@ -501,6 +494,30 @@ int mappable_x_hpil(int max, int *cmd) {
     if (reg_x->type == TYPE_REAL) {
         phloat x = ((vartype_real *) reg_x)->x;
 		if ((x < 0) || (x > 65535 )) {
+            return ERR_INVALID_DATA;
+		}
+        arg = to_int(x);
+		if (x > max) {
+            return ERR_INVALID_DATA;
+		}
+	}
+	else {
+        return ERR_INVALID_TYPE;
+	}
+	*cmd = (uint16_t) arg;
+    return ERR_NONE;
+}
+
+/* mappable_device_hpil()
+ *
+ * Validate x value for message assembly
+ * accepting -1, disable device, especially printer
+ */
+int mappable_device_hpil(int max, int *cmd) {
+	int arg;
+    if (reg_x->type == TYPE_REAL) {
+        phloat x = ((vartype_real *) reg_x)->x;
+		if ((x < -1) || (x > 32767 )) {
             return ERR_INVALID_DATA;
 		}
         arg = to_int(x);

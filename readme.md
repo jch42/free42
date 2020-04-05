@@ -39,7 +39,7 @@ All other functions are user code, see ./modules/NewPlot.raw.
 * Bonus functions
 - DSKSEL function to select the desired mass storage device.
 - IFC to reset loop controler
-- PRTSEL function to select the desired printer.
+- PRTSEL function to select the desired printer, -1 to disable HPIL printer.
 - INACCL stop at specified character or CR/LF, usefull to deal with CSV files.
 
 

@@ -103,6 +103,7 @@ int hpil_pause_sub(int error);
 int hpil_pauseAndDisplay_sub(int error);
 
 int mappable_x_hpil(int max, int *cmd);
+int mappable_device_hpil(int max, int *cmd);
 int mappable_x_char(uint8_t *c);
 int hpil_splitAlphaReg(int mode);
 
