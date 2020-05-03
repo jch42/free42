@@ -100,7 +100,9 @@ error_spec errors[] = {
 	{ /* NO PLOTTER */			   "No plotter",			  10 },
 	{ /* PLOTTER ERROR */		   "Plotter error",			  13 },
 	{ /* PLOTTER DATA ERROR */	   "Plotter data error",	  18 },
-	{ /* PLOTTER RANGE ERROR */	   "Plotter range error",	  19 }
+	{ /* PLOTTER RANGE ERROR */	   "Plotter range error",	  19 },
+	{ /* SHADOW RUNNING */		   NULL,					   0 },
+	{ /* OVERLAPED OPERATION */	   "HP-IL overlaped op",	  18 }
 };
 
 

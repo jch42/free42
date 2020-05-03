@@ -69,8 +69,10 @@ typedef struct state {
 } state_type;
 
 extern state_type state;
+extern int running;
 
-extern HINSTANCE hInst;                                    // current instance
+extern HINSTANCE hInst;										// current instance
+extern HWND hMainWnd;										// our main window
 extern char free42dirname[FILENAMELEN];
 
 ci_string GetDlgItemTextLong(HWND hWnd, int item);

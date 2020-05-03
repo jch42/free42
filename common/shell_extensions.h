@@ -44,7 +44,7 @@ int shell_check_connectivity();
  * Frame is rebuild from serial rx.
  * Returns 1 when complete frame is received and clears tiemout4
  */
-int shell_read_frame(int *rx);
+int shell_read_frame(int *rx, int timeout);
 
 /* shell_write_frame()
  *
@@ -52,6 +52,31 @@ int shell_read_frame(int *rx);
  * is using com port, Frame is split according to ilser, full 8 bits improved format.
  * return 1 - IP server unreachable...
  */
-int shell_write_frame(int tx);
+int shell_write_frame(int frameTx);
+
+
+/* shell_enter_shadow()
+ *
+ * 1 -> enable shadow processing
+ * 0 -> disable shadow processing
+ */
+int shell_set_shadow();
+
+// Alterning timer / polling callbacks 
+VOID CALLBACK timeoutZ(HWND hwnd, UINT uMsg, UINT idEvent, DWORD dwTime);
+VOID CALLBACK processRxFrame(HWND hwnd, UINT uMsg, ULONG_PTR dwData, LRESULT lResult);
+// background running for hpil_worker, initial ifc and print
+extern int shadowRunning;
+// global flag to let things run
+#define SHADOWGO		0x0010
+// stand alone, background running, must be cancelled by initiator
+#define SHADOWRUNALONE	0x0008
+// running program going to wait, resume when done
+#define SHADOWRUNONCE	0x0004
+// background waiting for shadow process to terminate
+#define SHADOWWAIT		0x0002
+// shadow process terminating, sucessful or not
+#define SHADOWDONE		0x0001
+extern int (*shadowProcess)();
 
 #endif

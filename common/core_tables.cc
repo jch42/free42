@@ -474,8 +474,8 @@ static const command_spec cmd_array[] =
 
     /* hpil extended io */
     { /* ANUMDEL */     "ANUMDEL",              7, docmd_anumdel,     0x0000a5ca, ARG_NONE,  FLAG_NONE },
-    { /* CLRDEV */      "CL\240DEV",            6, docmd_clrdev,      0x0000a5d4, ARG_NONE,  FLAG_NONE },
-    { /* CLRLOOP */     "CL\240LOOP",           7, docmd_clrloop,     0x0000a5d5, ARG_NONE,  FLAG_NONE },
+    { /* CLRDEV */      "CL\322DEV",            6, docmd_clrdev,      0x0000a5d4, ARG_NONE,  FLAG_NONE },
+    { /* CLRLOOP */     "CL\322LOOP",           7, docmd_clrloop,     0x0000a5d5, ARG_NONE,  FLAG_NONE },
     { /* INAC */        "IN\301C",              4, docmd_inac,        0x0000a5da, ARG_NONE,  FLAG_NONE },
     { /* INACL */       "IN\301CL",             5, docmd_inacl,       0x0000a5db, ARG_NONE,  FLAG_NONE },
     { /* INAE */        "IN\301E",              4, docmd_inae,        0x0000a5dc, ARG_NONE,  FLAG_NONE },

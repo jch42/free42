@@ -29,6 +29,7 @@
 #include "hpil_common.h"
 #include "hpil_controller.h"
 #include "hpil_plotter.h"
+#include "hpil_printer.h"
 #include "shell.h"
 #include "shell_extensions.h"
 #include "string.h"
@@ -53,16 +54,26 @@ int hpil_step;
 int (*hpil_completion_st[Hpil_stack_depth])(int);
 int hpil_step_st[Hpil_stack_depth];
 int hpil_sp;
+// enable some background processing within an running hpil operation
+int (*hpil_pending)(int);
 
-int IFCRunning, IFCCountdown;	// IFC timing
-
-char hpil_text[23];		// generic test buffer
+int IFCRunning;
+int IFCCountdown, IFCNoisy;		// IFC tries and IFC noisy ignored frame 
+char hpil_text[23];				// generic test buffer
 uint4 lastTimeCheck, timeCheck;
+
+int lateRx;						// async received frame
+int waitingRx;					// frame send / frame received indicator
+#define FRAMESENDONLOOP		1
+#define WAITINGFRAMERETURN	2
+#define LATEFRAMERETURN		3
+#define NOFRAMERETURNED		4
 
 AlphaSplit alphaSplit;
 
-void clear_il_st();
-int hpil_write_frame(void);
+void clear_ilStack();
+int hpil_write_frame(int frame);
+int hpil_read_frame(int *frameRx);
 
 /* restart
  *
@@ -76,7 +87,6 @@ void hpil_restart(void) {
 	hpilXCore.bufPtr = 0;
 	hpilXCore.statusFlags = 0;
 	hpil_core.begin(&hpilXCore);
-	hpil_settings.modeTransparent = false;
 }
 
 /* start
@@ -88,14 +98,15 @@ void hpil_restart(void) {
 void hpil_start(void) {
 	hpil_restart();
 	hpil_completion = NULL;
-	clear_il_st();
+	hpil_pending = NULL;
+	hpil_settings.printStacked = 0;
+	clear_ilStack();
 }
 
 /* IL init
  *
  */
 void hpil_init(bool modeEnabled, bool modePIL_Box) {
-	int err = ERR_BROKEN_LOOP;
 	hpil_settings.modeEnabled = modeEnabled;
 	hpil_settings.modePIL_Box = modePIL_Box;
 	hpil_start();
@@ -103,38 +114,22 @@ void hpil_init(bool modeEnabled, bool modePIL_Box) {
 	hpil_plotter_init();
 	if (hpil_settings.modePIL_Box) {
 		shell_write_frame(M_CON);
-		loopTimeout = 250;			// 500 ms
-		frame = M_NOP;
-		while (!shell_read_frame(&frame) && loopTimeout--);
-		if (frame != M_CON) {
+		if (!(hpil_read_frame(&frame) == 1 && frame == M_CON)) {
 			hpil_settings.modeEnabled = false;
 		}
 	}
 	if (hpil_settings.modeEnabled) {
 		ILCMD_IFC;
 		IFCRunning = 1;
-		IFCCountdown = 15;
-		hpil_settings.modeTransparent = true;
-		do {
-			err = hpil_worker(ERR_NONE);
-		} 
-		while (err == ERR_INTERRUPTIBLE);
-		hpil_settings.modeTransparent = false;
-	}
-	if (err != ERR_NONE) {
-			hpil_settings.modeEnabled = false;
-	}
-	else {
-		flags.f.VIRTUAL_input = hpil_settings.modeEnabled;
+		IFCCountdown = IFCNoisy = 5;
+		shell_set_shadow();
 	}
 }
 
 void hpil_close(bool modeEnabled, bool modePil_Box) {
 	if (hpil_settings.modePIL_Box) {
 		shell_write_frame(M_COFF);
-		loopTimeout = 250;			// 500 ms
-		frame = M_NOP;
-		while (!shell_read_frame(&frame) && loopTimeout--);
+		hpil_read_frame(&frame);
 	}
 }
 
@@ -151,7 +146,13 @@ int hpil_check() {
 		err = ERR_BROKEN_LOOP;
 	}
 	else if (hpilXCore.statusFlags & (CmdNew | CmdRun)) {
-		err = ERR_RESTRICTED_OPERATION;
+		// another already running hpil command...
+		if (hpil_completion == hpil_print_completion) {
+			err = ERR_OVERLAPED_OPERATION;
+		}
+		else {
+			err = ERR_RESTRICTED_OPERATION;
+		}
 	}
 	else { 
 		err = shell_check_connectivity();
@@ -165,6 +166,7 @@ int hpil_check() {
  */
 int hpil_worker(int interrupted) {
 	int err = ERR_INTERRUPTIBLE;
+	int saveIfc;
 	// debug...
 	//char s[100];
 	if (interrupted) {
@@ -172,8 +174,6 @@ int hpil_worker(int interrupted) {
 	}
 	// New command ?
 	else  if (hpilXCore.statusFlags & CmdNew) {
-		//sprintf(s,"New %06X\n",controllerCommand);
-		//shell_write_console(s);
 		// clear buffers status flags
 		hpilXCore.statusFlags &= ~MaskBuf;
 		if (controllerCommand == Local) {
@@ -184,6 +184,24 @@ int hpil_worker(int interrupted) {
 			}
 			else {
 				hpil_core.pseudoSet(hshk);
+			}
+		}
+		else if (controllerCommand == (Local | pse)) {
+			// fake command, just pause
+			if (waitingRx == NOFRAMERETURNED) {
+				waitingRx = 0;
+				hpilXCore.statusFlags &= ~CmdNew;
+				if (hpil_completion) {
+					err =  hpil_completion(ERR_NONE);
+				}
+				else {
+					hpil_core.pseudoSet(hshk);
+				}
+			}
+			else if (waitingRx != WAITINGFRAMERETURN) {
+				// dummy read !
+				waitingRx = FRAMESENDONLOOP;
+				hpil_read_frame(NULL);
 			}
 		}
 		else {
@@ -206,78 +224,91 @@ int hpil_worker(int interrupted) {
 			while (hpil_core.process()) {
 				if (hpil_core.pseudoTcl(outf)) {
 					frame = hpil_core.frameTx();
-					if (hpil_write_frame() != ERR_NONE) {
+					if (hpil_write_frame(frame) != ERR_NONE) {
 						err = ERR_BROKEN_IP;
 					}
 				}
 			}
 		}
 	}
-	else if (IFCRunning) {
-		if (shell_read_frame(&frame)) {
-			//sprintf(s,"IFC Rx  %06X\n",frame);
-			//shell_write_console(s);
-			hpil_core.frameRx((uint16_t)frame);			
-			switch (IFCRunning) {
-				case 1 :		// > IFC has been looped back
-					if (frame == M_IFC) {
-						// and received - process loop
-						while (hpil_core.process()) {
-							if (hpil_core.pseudoTcl(outf)) {
-								frame = hpil_core.frameTx();
-								if (hpil_write_frame() != ERR_NONE) {
-									// check on first send only
-									err = ERR_BROKEN_IP;
+	else if (waitingRx == FRAMESENDONLOOP || waitingRx == LATEFRAMERETURN) {
+		if (hpil_read_frame(&frame)) {
+			hpil_core.frameRx((uint16_t)frame);
+			if (IFCRunning) {
+				saveIfc= IFCRunning;
+				switch (IFCRunning) {
+					case 1 :
+						if (frame == M_IFC) {					// > IFC has been looped back
+							while (hpil_core.process()) {
+								if (hpil_core.pseudoTcl(outf)) {
+									frame = hpil_core.frameTx();
+									if (hpil_write_frame(frame) != ERR_NONE) {
+										// check on first send only
+										err = ERR_BROKEN_IP;
+									}
 								}
 							}
+							IFCRunning++;
 						}
-						IFCRunning++;
+						break;
+					case 2 :	
+						if (frame == M_RFC) {					// > RFC looped too	
+							while (hpil_core.process());
+							IFCRunning = 0;
+							hpil_settings.modeEnabled = true;
+							flags.f.VIRTUAL_input = hpil_settings.modeEnabled;
+						}
+						break;
+				}
+				if (IFCRunning == saveIfc)  {					// > IFC no change
+					if (IFCNoisy --) {
+						hpil_write_frame(-1);					// fake write to reactivate frame rx
 					}
-					break;
-				case 2 :	// > IFC looped - wait for RFC
-					if (frame == M_RFC) {
-						// rfc received, process loop;
-						while (hpil_core.process());
-						IFCRunning = 0;
+					else if (IFCCountdown--) {					// > IFC timeout
+						hpil_core.begin(&hpilXCore);
+						hpilXCore.statusFlags = 0;
+						ILCMD_IFC;
 					}
-					break;
+				}
+			}
+			else {
+				while (hpil_core.process()) {
+					if (hpil_core.pseudoTcl(outf)) {
+						frame = hpil_core.frameTx();
+						if (hpil_write_frame(frame) != ERR_NONE) {
+							err = ERR_BROKEN_IP;
+						}
+					}
+				}
 			}
 		}
-		else if (IFCRunning == 1 && loopTimeout < 2 && (IFCCountdown-- > 0)) {
-			// need to restart core state machine
+		else {
+			// waiting returning frame...
+			err = ERR_SHADOWRUNNING;
+		}
+	}
+	else if (waitingRx == NOFRAMERETURNED) {
+		if (IFCRunning && IFCCountdown--) {			// > IFC timeout
 			hpil_core.begin(&hpilXCore);
 			hpilXCore.statusFlags = 0;
 			ILCMD_IFC;
 		}
 		else {
-			loopTimeout --;
-		}
-	}
-	// Receiving message ?
-	else if (shell_read_frame(&frame)) {
-		hpil_core.frameRx((uint16_t)frame);
-		while (hpil_core.process()) {
-			if (hpil_core.pseudoTcl(outf)) {
-				frame = hpil_core.frameTx();
-				if (hpil_write_frame() != ERR_NONE) {
-					err = ERR_BROKEN_IP;
-				}
-			}
+			err = ERR_BROKEN_LOOP;
 		}
 	}
 	else {
-		loopTimeout--;
 		while (hpil_core.process()) {
 			if (hpil_core.pseudoTcl(outf)) {
 				frame = hpil_core.frameTx();
-				if (hpil_write_frame() != ERR_NONE) {
+				if (hpil_write_frame(frame) != ERR_NONE) {
 					err = ERR_BROKEN_IP;
 				}
 			}
 		}
 	}
 	// check end of current command
-	if (hpil_core.pseudoTcl(hshk)){
+	if (err == ERR_INTERRUPTIBLE && hpil_core.pseudoTcl(hshk)){
 		hpilXCore.statusFlags &= ~CmdRun;
 		hpilXCore.statusFlags |= CmdHshk;
 		if (hpil_completion) {
@@ -287,10 +318,11 @@ int hpil_worker(int interrupted) {
 			err = ERR_NONE;
 		}
 	}
-	if (loopTimeout == 0) {
-		err = ERR_BROKEN_LOOP;
-	}
 	if (err == ERR_NONE || err == ERR_INTERRUPTIBLE || err == ERR_RUN) {
+		if (err == ERR_NONE) {
+			// clear hpil_completion
+			hpil_completion = NULL;
+		}
 		// check buffers level and process
 		if (hpilXCore.statusFlags & FullListenBuf) {
 			if (hpilXCore.statusFlags & RunAgainListenBuf) {
@@ -315,11 +347,8 @@ int hpil_worker(int interrupted) {
 			}
 		}
 	}
-	else if (err == ERR_NO_PRINTER) {
+	else if (err == ERR_SHADOWRUNNING) {
 		// nothing to do
-	}
-	else if (hpil_settings.modeTransparent) {
-		hpil_restart();
 	}
 	else {
 		hpil_start();
@@ -328,27 +357,91 @@ int hpil_worker(int interrupted) {
 	return err;
 }
 
+/* hpil_rxWorker
+ *
+ * place holder for differed frame rx 
+ */
+void hpil_rxWorker(int frameOk, int frameRx) {
+
+	if (frameOk) {
+		lateRx = frameRx;
+		waitingRx = LATEFRAMERETURN;
+	}
+	else {
+		waitingRx = NOFRAMERETURNED;
+	}
+}
+
+/* hpil_enterShadow()
+ *
+ * bootstrap to shell
+ */
+int hpil_enterShadow() {
+	return shell_set_shadow();
+}
+
 /* hpil_write_frame
  * 
  * send frame, prepare for timeout
  */
-int hpil_write_frame() {
-	if (!shell_write_frame(frame)) {
-		return ERR_BROKEN_IP;
+int hpil_write_frame(int frameTx) {
+
+	if ((frameTx & 0x0600) == 0x0600) {	// IDY
+		loopTimeout = 250;				//  -> 250 ms (augmented from initial 50 ms, too much latency for idy)
 	}
-	if ((frame & 0x0600) == 0x0600) {	// IDY
-		loopTimeout = 125;				// 125 x 2 ms shell timeout -> 250 ms (augmented from initial 50 ms, too much latency for idy)
+	else if (frameTx == 0x0490) {		// IFC - special timing - increase timing at each loop
+		loopTimeout = 500 + (100 * (5 - IFCCountdown));
 	}
-	else if (frame == 0x0490) {			// IFC - special timing - increase timing at each loop
-		loopTimeout = 50 * (16 - IFCCountdown);
-	}
-	else if (frame & 0x0400) {			// CMD
-		loopTimeout = 500;				// 500 x 2 ms shell timeout -> 1000 ms
+	else if (frameTx & 0x0400) {		// CMD
+		loopTimeout = 1000;				//  -> 1000 ms
 	}
 	else {								// DOE or RDY
-		loopTimeout = 1500;				// 1500 x 2 ms shell timeout -> 3000 ms
+		loopTimeout = 3000;				//  -> 3000 ms
 	}
+	if (frameTx != -1) {
+		if (shell_write_frame(frameTx)) {
+			return ERR_BROKEN_IP;
+		}
+	}
+	else {								// Idy noisy frames, empty pipe
+		loopTimeout = 0;
+	}
+	waitingRx = FRAMESENDONLOOP;
 	return ERR_NONE;
+}
+
+/* hpil_read_frame
+ * 
+ * receive frame
+ */
+int hpil_read_frame(int *frameRx) {
+	int frameOk;
+	switch (waitingRx) {
+		case FRAMESENDONLOOP:
+			// first attempt after frame emission
+			frameOk = shell_read_frame(frameRx, loopTimeout);
+			if (frameOk) {
+				waitingRx = 0;
+			}
+			else {
+				waitingRx = WAITINGFRAMERETURN;
+			}
+			return frameOk;
+			break;
+		case LATEFRAMERETURN:
+			// frame return, finally
+			*frameRx = lateRx;
+			waitingRx = 0;
+			return 1;
+			break;
+		default:
+			// WAITINGFRAMERETURN should not occur
+			// NOFRAMERETURNED broken loop ???
+			// anything else should not occur
+			waitingRx = 0;
+			return -1;
+			break;
+	}
 }
 
 /* IL stack
@@ -357,16 +450,36 @@ int hpil_write_frame() {
  */
 int call_ilCompletion(int (*hpil_completion_call)(int)) {
     int err = ERR_INTERRUPTIBLE;
-    if (hpil_sp == Hpil_stack_depth) {
-        err = ERR_IL_ERROR;
-    }
-	else {
+    if (hpil_sp < Hpil_stack_depth - 1) {
 		hpil_completion_st[hpil_sp] = hpil_completion;
 		hpil_step_st[hpil_sp] = hpil_step;
 		hpil_sp++;
 		hpil_completion = hpil_completion_call;
 		hpil_step = 0;
+    }
+	else {
+        err = ERR_IL_ERROR;
 	}
+    return err;
+}
+
+/* IL stack
+ *
+ * insert 'background' processing 
+ */
+int insert_ilCompletion() {
+    int err = ERR_INTERRUPTIBLE;
+    if (hpil_sp < Hpil_stack_depth - 1) {
+		hpil_completion_st[hpil_sp] = hpil_completion;
+		hpil_step_st[hpil_sp] = hpil_step;
+		hpil_sp++;
+		hpil_completion = hpil_pending;
+		hpil_step = 0;
+    }
+	else {
+        err = ERR_IL_ERROR;
+	}
+	hpil_pending = NULL;
     return err;
 }
 
@@ -374,7 +487,7 @@ int call_ilCompletion(int (*hpil_completion_call)(int)) {
  *
  * counterpart for call
  */
-int rtn_il_completion() {
+int rtn_ilCompletion() {
     int err = ERR_INTERRUPTIBLE;
     if (hpil_sp == 0) {
         err = ERR_IL_ERROR;
@@ -391,7 +504,7 @@ int rtn_il_completion() {
  *
  * simply set sp to 0
  */
-void clear_il_st() {
+void clear_ilStack() {
     hpil_sp = 0;
 }
 
@@ -419,7 +532,7 @@ int hpil_aid_sub(int error) {
 				break;
 			case 3 :		// UNT
 				ILCMD_UNT;
-				error = rtn_il_completion();
+				error = rtn_ilCompletion();
 				break;
 			default :
 				error = ERR_NONE;
@@ -428,60 +541,47 @@ int hpil_aid_sub(int error) {
 	return error;
 }
 
-/* hpil_Display
+/* hpil display and pause
  *
- * display / print
  */
-int hpil_display_sub(int error) {
+int hpil_displayAndPause_sub(int error) {
 	if (error == ERR_NONE) {
 		error = ERR_INTERRUPTIBLE;
-        if ((flags.f.trace_print || flags.f.normal_print)
-          && flags.f.printer_exists) {
-			print_text(hpil_text,22,1);
-		}
-		scroll_display(1,hpil_text,22);
-		error = rtn_il_completion();
-	}
-	ILCMD_nop;
-	return error;
-}
-
-/* hpil_pause
- *
- * add a pause
- */
-int hpil_pause_sub(int error) {
-	if (error == ERR_NONE) {
-		error = ERR_INTERRUPTIBLE;
-		timeCheck = shell_milliseconds();
-		if (timeCheck - 500 > lastTimeCheck) {
-			lastTimeCheck = timeCheck;
-			error = rtn_il_completion();
-		}
-	}
-	ILCMD_nop;
-	return error;
-}
-
-/* hpil_pauseAndDisplay
- *
- * add a pause, and display / print
- */
-int hpil_pauseAndDisplay_sub(int error) {
-	if (error == ERR_NONE) {
-		error = ERR_INTERRUPTIBLE;
-		timeCheck = shell_milliseconds();
-		if (timeCheck - 500 > lastTimeCheck) {
-			lastTimeCheck = timeCheck;
-	        if ((flags.f.trace_print || flags.f.normal_print)
-			  && flags.f.printer_exists) {
-				print_text(hpil_text,22,1);
-			}
-			scroll_display(1,hpil_text,22);
-			error = rtn_il_completion();
+		switch (hpil_step) {
+			case 0 :
+				hpil_step++;;
+				scroll_display(1,hpil_text,22);
+		        if ((flags.f.trace_print || flags.f.normal_print)
+				  && flags.f.printer_exists) {
+					print_text(hpil_text,22,1);
+					if (hpil_pending) {
+						// inserted in hpil loop
+						if (insert_ilCompletion() == ERR_INTERRUPTIBLE) {
+							ILCMD_AAU;
+						}
+					}
+					else {
+						// just to let the loop run on
+						ILCMD_nop;
+					}
+				}
+				else {
+					// just to let the loop run on
+					ILCMD_nop;
+				}
+				break;
+			case 1 :
+				hpil_step++;
+				ILCMD_pse;
+				break;
+			case 2 :
+				ILCMD_nop;
+				error = rtn_ilCompletion();
+				break;
+			default :
+				error = ERR_IL_ERROR;
 		}
 	}
-	ILCMD_nop;
 	return error;
 }
 
@@ -528,7 +628,7 @@ int mappable_device_hpil(int max, int *cmd) {
 	else {
         return ERR_INVALID_TYPE;
 	}
-	*cmd = (uint16_t) arg;
+	*cmd = (uint32_t) arg;
     return ERR_NONE;
 }
 

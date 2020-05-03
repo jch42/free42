@@ -24,4 +24,7 @@
 void hpil_printText(const char *, int, int);
 void hpil_printLcd(const char *, int, int, int, int, int);
 
+// completion worker
+int hpil_print_completion(int error);
+
 #endif

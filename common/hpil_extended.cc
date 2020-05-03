@@ -65,8 +65,23 @@ extern int controllerCommand;
 extern int hpil_step;
 extern int hpil_worker(int interrupted);
 extern int (*hpil_completion)(int);
+extern int (*hpil_pending)(int);
 extern void (*hpil_emptyListenBuffer)(void);
 extern void (*hpil_fillTalkBuffer)(void);
+
+static int defrd_clrdev(int error);
+static int defrd_clrloop(int error);
+static int defrd_inac(int error);
+static int defrd_inacl(int error);
+static int defrd_inae(int error);
+static int defrd_inan(int error);
+static int defrd_inxb(int error);
+static int defrd_inaccl(int error);
+static int defrd_outac(int error);
+static int defrd_outacl(int error);
+static int defrd_outae(int error);
+static int defrd_outan(int error);
+static int defrd_outxb(int error);
 
 static int hpil_clrdev_completion(int error);
 static int hpil_clrloop_completion(int error);
@@ -168,12 +183,13 @@ int Xtract_num(int step, char *inputBuf, int inputLen, int *lastParsed, char *ou
 		else if (flags.f.thousands_separators && c == sep) {
 			switch (step) {
 				case _ParseInt :
+				case _ParseFrac :
 					break;
 				default :
 					step = _ParseIllegal;
 			}
 		}
-		else if (c == '.' || c == ',') {
+		else if (c == dot) {
 			switch (step) {
 				case _ParseNone :
 				case _ParseSign :
@@ -381,124 +397,204 @@ int docmd_anumdel(arg_struct *arg) {
 int docmd_clrdev(arg_struct *arg) {
 	int err;
 	err = hpil_check();
-	if (err != ERR_NONE) {
+	if (err == ERR_OVERLAPED_OPERATION) {
+		mode_interruptible = defrd_clrdev;
+		return ERR_INTERRUPTIBLE;
+	}
+	else if (err != ERR_NONE) {
 		return err;
 	}
-	ILCMD_AAU;
-	hpil_step = 0;
-	hpil_completion = hpil_clrdev_completion;
-	mode_interruptible = hpil_worker;
-	return ERR_INTERRUPTIBLE;
+	return defrd_clrdev(ERR_NONE);
+}
+
+static int defrd_clrdev(int error) {
+	if (error == ERR_NONE) {
+		error = ERR_INTERRUPTIBLE;
+		ILCMD_AAU;
+		hpil_step = 0;
+		hpil_completion = hpil_clrdev_completion;
+		mode_interruptible = hpil_worker;
+		mode_stoppable = true;
+	}
+	return error;
 }
 
 int docmd_clrloop(arg_struct *arg) {
 	int err;
 	err = hpil_check();
-	if (err != ERR_NONE) {
+	if (err == ERR_OVERLAPED_OPERATION) {
+		mode_interruptible = defrd_clrloop;
+		return ERR_INTERRUPTIBLE;
+	}
+	else if (err != ERR_NONE) {
 		return err;
 	}
-	ILCMD_AAU;
-	hpil_step = 0;
-	hpil_completion = hpil_clrloop_completion;
-	mode_interruptible = hpil_worker;
-	return ERR_INTERRUPTIBLE;
+	return defrd_clrloop(ERR_NONE);
+}
+
+static int defrd_clrloop(int error) {
+	if (error == ERR_NONE) {
+		error = ERR_INTERRUPTIBLE;
+		ILCMD_AAU;
+		hpil_step = 0;
+		hpil_completion = hpil_clrloop_completion;
+		mode_interruptible = hpil_worker;
+		mode_stoppable = true;
+	}
+	return error;
 }
 
 int docmd_inac(arg_struct *arg) {
 	int err;
 	err = hpil_check();
-	if (err != ERR_NONE) {
+	if (err == ERR_OVERLAPED_OPERATION) {
+		mode_interruptible = defrd_inac;
+		return ERR_INTERRUPTIBLE;
+	}
+	else if (err != ERR_NONE) {
 		return err;
 	}
-	err = mappable_x_char(&hpilXCore.endChar);
-	if (err != ERR_NONE) {
-		return err;
+	return defrd_inac(ERR_NONE);
+}
+
+static int defrd_inac(int error) {
+	if (error == ERR_NONE) {
+		error = mappable_x_char(&hpilXCore.endChar);
+		if (error == ERR_NONE) {
+			error = ERR_INTERRUPTIBLE;
+			reg_alpha_length = 1;
+			reg_alpha[0]='D';
+			ioEndMethod = MethodChar;
+			ioTargetRegister = AlphaRegister;
+			ILCMD_AAU;
+			hpil_step = 0;
+			hpil_completion = hpil_inx_completion;
+			mode_interruptible = hpil_worker;
+			mode_stoppable = true;
+		}
 	}
-    reg_alpha_length = 1;
-	reg_alpha[0]='D';
-	ioEndMethod = MethodChar;
-	ioTargetRegister = AlphaRegister;
-	ILCMD_AAU;
-	hpil_step = 0;
-	hpil_completion = hpil_inx_completion;
-	mode_interruptible = hpil_worker;
-	return ERR_INTERRUPTIBLE;
+	return error;
 }
 
 int docmd_inacl(arg_struct *arg) {
 	int err;
 	err = hpil_check();
-	if (err != ERR_NONE) {
+	if (err == ERR_OVERLAPED_OPERATION) {
+		mode_interruptible = defrd_inacl;
+		return ERR_INTERRUPTIBLE;
+	}
+	else if (err != ERR_NONE) {
 		return err;
 	}
-    reg_alpha_length = 1;
-	reg_alpha[0]='D';
-	ioEndMethod = MethodCrLf;
-	ioTargetRegister = AlphaRegister;
-	ILCMD_AAU;
-	hpil_step = 0;
-	hpil_completion = hpil_inx_completion;
-	mode_interruptible = hpil_worker;
-	return ERR_INTERRUPTIBLE;
+	return defrd_inacl(ERR_NONE);
+}
+
+static int defrd_inacl(int error) {
+	if (error == ERR_NONE) {
+		error = ERR_INTERRUPTIBLE;
+	    reg_alpha_length = 1;
+		reg_alpha[0]='D';
+		ioEndMethod = MethodCrLf;
+		ioTargetRegister = AlphaRegister;
+		ILCMD_AAU;
+		hpil_step = 0;
+		hpil_completion = hpil_inx_completion;
+		mode_interruptible = hpil_worker;
+		mode_stoppable = true;
+	}
+	return error;
 }
 
 int docmd_inae(arg_struct *arg) {
 	int err;
 	err = hpil_check();
-	if (err != ERR_NONE) {
+	if (err == ERR_OVERLAPED_OPERATION) {
+		mode_interruptible = defrd_inae;
+		return ERR_INTERRUPTIBLE;
+	}
+	else if (err != ERR_NONE) {
 		return err;
 	}
-    reg_alpha_length = 1;
-	reg_alpha[0]='D';
-	ioEndMethod = MethodEnd;
-	ioTargetRegister = AlphaRegister;
-	ILCMD_AAU;
-	hpil_step = 0;
-	hpil_completion = hpil_inx_completion;
-	mode_interruptible = hpil_worker;
-	return ERR_INTERRUPTIBLE;
+	return defrd_inae(ERR_NONE);
+}
+
+static int defrd_inae(int error) {
+	if (error == ERR_NONE) {
+		error = ERR_INTERRUPTIBLE;
+		reg_alpha_length = 1;
+		reg_alpha[0]='D';
+		ioEndMethod = MethodEnd;
+		ioTargetRegister = AlphaRegister;
+		ILCMD_AAU;
+		hpil_step = 0;
+		hpil_completion = hpil_inx_completion;
+		mode_interruptible = hpil_worker;
+		mode_stoppable = true;
+	}
+	return error;
 }
 
 int docmd_inan(arg_struct *arg) {
 	int err;
 	err = hpil_check();
-	if (err != ERR_NONE) {
+	if (err == ERR_OVERLAPED_OPERATION) {
+		mode_interruptible = defrd_inan;
+		return ERR_INTERRUPTIBLE;
+	}
+	else if (err != ERR_NONE) {
 		return err;
 	}
-	err = mappable_x_hpil(43,&ioLength);
-	if (err != ERR_NONE) {
-		return err;
+	return defrd_inan(ERR_NONE);
+}
+
+static int defrd_inan(int error) {
+	if (error == ERR_NONE) {
+		error = mappable_x_hpil(43,&ioLength);
+		if (error == ERR_NONE) {
+			error = ERR_INTERRUPTIBLE;
+			reg_alpha_length = 1;
+			reg_alpha[0]='D';
+			ioEndMethod = MethodLen;
+			ioTargetRegister = AlphaRegister;
+			ILCMD_AAU;
+			hpil_step = 0;
+			hpil_completion = hpil_inx_completion;
+			mode_interruptible = hpil_worker;
+		}
 	}
-    reg_alpha_length = 1;
-	reg_alpha[0]='D';
-	ioEndMethod = MethodLen;
-	ioTargetRegister = AlphaRegister;
-	ILCMD_AAU;
-	hpil_step = 0;
-	hpil_completion = hpil_inx_completion;
-	mode_interruptible = hpil_worker;
-	return ERR_INTERRUPTIBLE;
+	return error;
 }
 
 int docmd_inxb(arg_struct *arg) {
 	int err;
 	err = hpil_check();
-	if (err != ERR_NONE) {
+	if (err == ERR_OVERLAPED_OPERATION) {
+		mode_interruptible = defrd_inxb;
+		return ERR_INTERRUPTIBLE;
+	}
+	else if (err != ERR_NONE) {
 		return err;
 	}
-	ioEndMethod = MethodNone;
-	ioTargetRegister = XRegister;
-	ILCMD_AAU;
-	hpil_step = 0;
-	hpil_completion = hpil_inx_completion;
-	mode_interruptible = hpil_worker;
-	return ERR_INTERRUPTIBLE;
+	return defrd_inxb(ERR_NONE);
+}
+
+static int defrd_inxb(int error) {
+	if (error == ERR_NONE) {
+		error = ERR_INTERRUPTIBLE;	
+		ioEndMethod = MethodNone;
+		ioTargetRegister = XRegister;
+		ILCMD_AAU;
+		hpil_step = 0;
+		hpil_completion = hpil_inx_completion;
+		mode_interruptible = hpil_worker;
+	}
+	return error;
 }
 
 /* inaccl
  *
  * Special function to keep with csv type line
- * read up to c ro crlf character
+ * read up to c or crlf character
  * if condition Ok, flag 17 is cleared
  * if c, flag 18 is reset
  * if crlf, flag 18 is set
@@ -506,127 +602,189 @@ int docmd_inxb(arg_struct *arg) {
 int docmd_inaccl(arg_struct *arg) {
 	int err;
 	err = hpil_check();
-	if (err != ERR_NONE) {
+	if (err == ERR_OVERLAPED_OPERATION) {
+		mode_interruptible = defrd_inaccl;
+		return ERR_INTERRUPTIBLE;
+	}
+	else if (err != ERR_NONE) {
 		return err;
 	}
-	err = mappable_x_char(&hpilXCore.endChar);
-	if (err != ERR_NONE) {
-		return err;
+	return defrd_inaccl(ERR_NONE);
+}
+
+static int defrd_inaccl(int error) {
+	if (error == ERR_NONE) {
+		error = mappable_x_char(&hpilXCore.endChar);
+		if (error == ERR_NONE) {
+			error = ERR_INTERRUPTIBLE;	
+		    reg_alpha_length = 1;
+			reg_alpha[0]='D';
+			ioEndMethod = MethodCharOrCrlf;
+			ioTargetRegister = AlphaRegister;
+			ILCMD_AAU;
+			hpil_step = 0;
+			hpil_completion = hpil_inx_completion;
+			mode_interruptible = hpil_worker;
+		}
 	}
-    reg_alpha_length = 1;
-	reg_alpha[0]='D';
-	ioEndMethod = MethodCharOrCrlf;
-	ioTargetRegister = AlphaRegister;
-	ILCMD_AAU;
-	hpil_step = 0;
-	hpil_completion = hpil_inx_completion;
-	mode_interruptible = hpil_worker;
-	return ERR_INTERRUPTIBLE;
+	return error;
 }
 
 int docmd_outac(arg_struct *arg) {
 	int err;
-	int i;
 	err = hpil_check();
-	if (err != ERR_NONE) {
+	if (err == ERR_OVERLAPED_OPERATION) {
+		mode_interruptible = defrd_outac;
+		return ERR_INTERRUPTIBLE;
+	}
+	else if (err != ERR_NONE) {
 		return err;
 	}
-	err = mappable_x_char(&hpilXCore.endChar);
-	if (err != ERR_NONE) {
-		return err;
+	return defrd_outac(ERR_NONE);
+}
+
+static int defrd_outac(int error) {
+	int i;
+	if (error == ERR_NONE) {
+		error = mappable_x_char(&hpilXCore.endChar);
+		if (error == ERR_NONE) {
+			error = ERR_INTERRUPTIBLE;	
+			for (i = 0; i < (reg_alpha_length - 1); i++) {
+				hpilXCore.buf[i] = reg_alpha[i+1];
+			}
+			hpilXCore.buf[i++] = hpilXCore.endChar;
+			hpilXCore.bufSize = i;
+			ILCMD_AAU;
+			hpil_step = 0;
+			hpil_completion = hpil_outx_completion;
+			mode_interruptible = hpil_worker;
+		}
 	}
-	for (i = 0; i < (reg_alpha_length - 1); i++) {
-		hpilXCore.buf[i] = reg_alpha[i+1];
-	}
-	hpilXCore.buf[i++] = hpilXCore.endChar;
-	hpilXCore.bufSize = i;
-	ILCMD_AAU;
-	hpil_step = 0;
-	hpil_completion = hpil_outx_completion;
-	mode_interruptible = hpil_worker;
-	return ERR_INTERRUPTIBLE;
+	return error;
 }
 
 int docmd_outacl(arg_struct *arg) {
 	int err;
-	int i;
 	err = hpil_check();
-	if (err != ERR_NONE) {
+	if (err == ERR_OVERLAPED_OPERATION) {
+		mode_interruptible = defrd_outacl;
+		return ERR_INTERRUPTIBLE;
+	}
+	else if (err != ERR_NONE) {
 		return err;
 	}
-	for (i = 0; i < (reg_alpha_length - 1); i++) {
-		hpilXCore.buf[i] = reg_alpha[i+1];
+	return defrd_outacl(ERR_NONE);
+}
+
+static int defrd_outacl(int error) {
+	int i;
+	if (error == ERR_NONE) {
+		error = ERR_INTERRUPTIBLE;	
+		for (i = 0; i < (reg_alpha_length - 1); i++) {
+			hpilXCore.buf[i] = reg_alpha[i+1];
+		}
+		hpilXCore.buf[i++] = 0x0d;
+		hpilXCore.buf[i++] = 0x0a;
+		hpilXCore.bufSize = i;
+		ILCMD_AAU;
+		hpil_step = 0;
+		hpil_completion = hpil_outx_completion;
+		mode_interruptible = hpil_worker;
 	}
-	hpilXCore.buf[i++] = 0x0d;
-	hpilXCore.buf[i++] = 0x0a;
-	hpilXCore.bufSize = i;
-	ILCMD_AAU;
-	hpil_step = 0;
-	hpil_completion = hpil_outx_completion;
-	mode_interruptible = hpil_worker;
-	return ERR_INTERRUPTIBLE;
+	return error;
 }
 
 int docmd_outae(arg_struct *arg) {
 	int err;
-	int i;
 	err = hpil_check();
-	if (err != ERR_NONE) {
+	if (err == ERR_OVERLAPED_OPERATION) {
+		mode_interruptible = defrd_outae;
+		return ERR_INTERRUPTIBLE;
+	}
+	else if (err != ERR_NONE) {
 		return err;
 	}
-	for (i = 0; i < (reg_alpha_length - 1); i++) {
-		hpilXCore.buf[i] = reg_alpha[i+1];
+	return defrd_outae(ERR_NONE);
+}
+
+static int defrd_outae(int error) {
+	int i;
+	if (error == ERR_NONE) {
+		error = ERR_INTERRUPTIBLE;	
+		for (i = 0; i < (reg_alpha_length - 1); i++) {
+			hpilXCore.buf[i] = reg_alpha[i+1];
+		}
+		hpilXCore.bufSize = i;
+		hpilXCore.statusFlags |= LastIsEndTalkBuf;
+		ILCMD_AAU;
+		hpil_step = 0;
+		hpil_completion = hpil_outx_completion;
+		mode_interruptible = hpil_worker;
 	}
-	hpilXCore.bufSize = i;
-	hpilXCore.statusFlags |= LastIsEndTalkBuf;
-	ILCMD_AAU;
-	hpil_step = 0;
-	hpil_completion = hpil_outx_completion;
-	mode_interruptible = hpil_worker;
-	return ERR_INTERRUPTIBLE;
+	return error;
 }
 
 int docmd_outan(arg_struct *arg) {
 	int err;
-	int i;
 	err = hpil_check();
-	if (err != ERR_NONE) {
+	if (err == ERR_OVERLAPED_OPERATION) {
+		mode_interruptible = defrd_outan;
+		return ERR_INTERRUPTIBLE;
+	}
+	else if (err != ERR_NONE) {
 		return err;
 	}
-	err = mappable_x_hpil(43,&ioLength);
-	if (err != ERR_NONE) {
-		return err;
+	return defrd_outan(ERR_NONE);
+}
+
+static int defrd_outan(int error) {
+	int i;
+	if (error == ERR_NONE) {
+		error =  mappable_x_hpil(43,&ioLength);
+		if (error == ERR_NONE) {
+			error = ERR_INTERRUPTIBLE;	
+			if (ioLength > (reg_alpha_length - 1) || ioLength == 0) {
+				ioLength = reg_alpha_length; 
+			}
+			for (i = 0; i < ioLength; i++) {
+				hpilXCore.buf[i] = reg_alpha[i+1];
+			}
+			hpilXCore.bufSize = i;
+			ILCMD_AAU;
+			hpil_step = 0;
+			hpil_completion = hpil_outx_completion;
+			mode_interruptible = hpil_worker;
+		}
 	}
-	if (ioLength > (reg_alpha_length - 1) || ioLength == 0) {
-		ioLength = reg_alpha_length; 
-	}
-	for (i = 0; i < ioLength; i++) {
-		hpilXCore.buf[i] = reg_alpha[i+1];
-	}
-	hpilXCore.bufSize = i;
-	ILCMD_AAU;
-	hpil_step = 0;
-	hpil_completion = hpil_outx_completion;
-	mode_interruptible = hpil_worker;
-	return ERR_INTERRUPTIBLE;
+	return error;
 }
 
 int docmd_outxb(arg_struct *arg) {
 	int err;
 	err = hpil_check();
-	if (err != ERR_NONE) {
+	if (err == ERR_OVERLAPED_OPERATION) {
+		mode_interruptible = defrd_outxb;
+		return ERR_INTERRUPTIBLE;
+	}
+	else if (err != ERR_NONE) {
 		return err;
 	}
-	err = mappable_x_hpil(255,(int *)hpilXCore.buf);
-	if (err != ERR_NONE) {
-		return err;
+	return defrd_outxb(ERR_NONE);
+}
+
+static int defrd_outxb(int error) {
+	if (error == ERR_NONE) {
+		error = mappable_x_hpil(255,(int *)hpilXCore.buf);
+		if (error == ERR_NONE) {
+			error = ERR_INTERRUPTIBLE;	
+			hpilXCore.bufSize = 1;
+			ILCMD_AAU;
+			hpil_step = 0;
+			hpil_completion = hpil_outx_completion;
+			mode_interruptible = hpil_worker;
+		}
 	}
-	hpilXCore.bufSize = 1;
-	ILCMD_AAU;
-	hpil_step = 0;
-	hpil_completion = hpil_outx_completion;
-	mode_interruptible = hpil_worker;
-	return ERR_INTERRUPTIBLE;
+	return error;
 
 }
 
@@ -679,12 +837,15 @@ static int hpil_inx_completion(int error) {
 		switch (hpil_step) {
 			case 0 :		// AAU > AAD
 				ILCMD_AAD(0x01);
+				hpil_step++;
 				break;
 			case 1 :		// AAD > TAD Selected
 				ILCMD_TAD(hpil_settings.selected);
+				hpil_step++;
 				break;
 			case 2 :		// TAD > ltn & prepare buffer
 				ILCMD_ltn;
+				hpil_step++;
 				switch (ioEndMethod) {
 					case MethodNone :
 						hpilXCore.bufSize = (ioTargetRegister == AlphaRegister) ? 43 : 1;
@@ -705,6 +866,7 @@ static int hpil_inx_completion(int error) {
 						hpilXCore.bufSize = ioLength;
 						break;
 					case MethodCharOrCrlf :
+						hpilXCore.bufSize = 43;
 						hpilXCore.statusFlags |= (ListenTilChar | ListenTilCrLf);
 						break;
 					default :
@@ -714,23 +876,38 @@ static int hpil_inx_completion(int error) {
 				break;
 			case 3 :		// Local listen > SDA
 				ILCMD_SDA;
+				hpil_step++;
 				break;
 			case 4 :		// SDA > lun
 				ILCMD_lun;
+				hpil_step++;
 				break;
 			case 5 :		// lun > UNT;
 				ILCMD_UNT;
+				hpil_step++;
 				break;
 			case 6 :		// get result
 				if (hpilXCore.bufPtr == 0) {
 					error = ERR_NO_RESPONSE;
 				}
 				else {
+					error = ERR_NONE;
 					if (ioTargetRegister == AlphaRegister) {
 						for (i = 0; i < (hpilXCore.bufPtr > 43 ? 43 : hpilXCore.bufPtr); i++) {
 							reg_alpha[i+1] = hpilXCore.buf[i];
 						}
 						reg_alpha_length = i+1;
+						if (flags.f.trace_print && flags.f.printer_exists) {
+							docmd_pra(NULL);
+							if (hpil_pending) {
+								// inserted in hpil loop
+								hpil_step++;
+								if (insert_ilCompletion() == ERR_INTERRUPTIBLE) {
+									error = ERR_INTERRUPTIBLE;
+									ILCMD_AAU;
+								}
+							}
+						}
 						switch (ioEndMethod) {
 							case MethodChar :
 								flags.f.hpil_ina_err = (hpilXCore.statusFlags & ListenTilChar) ? 1 : 0;
@@ -758,20 +935,28 @@ static int hpil_inx_completion(int error) {
 						}
 						else {
 							recall_result(v);
-							if (flags.f.trace_print && flags.f.printer_exists) {
-								docmd_prx(NULL);
+							if (hpil_pending) {
+								// inserted in hpil loop
+								hpil_step++;
+								if (insert_ilCompletion() == ERR_INTERRUPTIBLE) {
+									error = ERR_INTERRUPTIBLE;
+									ILCMD_AAU;
+								}
 							}
 						}
 					}
-					error = ERR_NONE;
 				}
+				hpilXCore.statusFlags &= ~(ListenTilEnd | ListenTilCrLf	| ListenTilChar);
+				break;
+			case 7 :		// just to let background printing occur
+				error = ERR_NONE;
 				break;
 			default :
 				error = ERR_INTERNAL_ERROR;
 		}
 	}
-	hpil_step++;
 	if (error != ERR_INTERRUPTIBLE) {
+		// ultimate cleanup
 		hpilXCore.statusFlags &= ~(ListenTilEnd | ListenTilCrLf	| ListenTilChar);
 	}
 	return error;

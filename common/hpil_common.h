@@ -42,8 +42,8 @@ typedef struct {
 	int plotter;					// first plotter in autoio mode
 	int prtAid;						// aid of printer
 	int dskAid;						// aid of disk
+	int printStacked;				// multiple printing in single loop
 	bool modeEnabled;				// hpil enabled...
-	bool modeTransparent;			// background loop processing
 	bool modePIL_Box;				// use PIL_Box
 } HPIL_Settings;
 
@@ -93,14 +93,16 @@ void hpil_init(bool modeEnabled, bool modePil_Box);
 void hpil_close(bool modeEnabled, bool modePil_Box);
 int hpil_check(void);
 int hpil_worker(int interrupted);
+void hpil_rxWorker(int frameOk, int frameRx);
+int hpil_enterShadow();
+
 int call_ilCompletion(int (*hpil_completion_call)(int));
-int rtn_il_completion();
+int insert_ilCompletion();
+int rtn_ilCompletion();
 
 int hpil_aid_sub(int error);
 
-int hpil_display_sub(int error);
-int hpil_pause_sub(int error);
-int hpil_pauseAndDisplay_sub(int error);
+int hpil_displayAndPause_sub(int error);
 
 int mappable_x_hpil(int max, int *cmd);
 int mappable_device_hpil(int max, int *cmd);

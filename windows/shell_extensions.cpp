@@ -27,14 +27,14 @@
 #include <shlobj.h>
 #include <stdio.h>
 
-#include "stdafx.h"
-#include "resource.h"
+#include "shell_main.h"
 
 #include "free42.h"
 #include "core_globals.h"
 #include "core_ebml.h"
 #include "core_main.h"
 #include "hpil_common.h"
+#include "shell.h"
 #include "shell_extensions.h"
 
 #pragma comment(lib, "Ws2_32.lib")
@@ -73,9 +73,20 @@ WSADATA wsaData;
 SOCKET clientSocket, serverSocket[2];
 WSAEVENT serverEvent[2];
 
+int shadowWorker();
 static void shell_init_port();
 static void shell_close_serial();
 static void shell_close_port();
+
+// message for frame rx callback
+#define WM_USER_RxFrame 0x0442
+// timer, wait returning frame
+static UINT timerZ;
+// max rx polling loops
+int maxLoop;
+// provisioning for hpil background processing
+int shadowRunning = 0;
+int (*shadowProcess)() = NULL;
 
 // Message handler for HP-IL preferences dialog.
 LRESULT CALLBACK HpIlPrefs(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam) {
@@ -407,6 +418,7 @@ int l, version;
   openExtensionDone:
 	fclose(EbmlStateFile);
 	shell_init_port();
+	shadowProcess = shadowWorker;
 }
 
 void close_extension(char* stateExtFilename) {
@@ -438,6 +450,55 @@ void close_extension(char* stateExtFilename) {
 	fclose(EbmlStateFile);
 	shell_close_port();
  }
+
+int shell_set_shadow() {
+	if (running) {
+		//shell_log("Insertion in running non hpil loop");
+		shadowRunning |= SHADOWRUNONCE;
+		running = 0;
+	}
+	//shell_log("Set ShadowGo and ShadowRunAlone");
+	shadowRunning |= SHADOWRUNALONE | SHADOWGO;
+    // Post dummy message to get the message loop moving again
+    PostMessage(hMainWnd, WM_USER, 0, 0);
+	return shadowRunning;
+}
+
+int shadowWorker() {
+	return hpil_worker(ERR_NONE);
+}
+
+void shadowEnter() { 
+	if (running) {
+		//shell_log("Set ShadowRunOnce and clear running");
+		shadowRunning |= SHADOWRUNONCE;
+		running = 0;
+	}
+	//shell_log("Set ShadowWait and clear ShadowGo and ShadowDone");
+	shadowRunning |= SHADOWWAIT;
+	shadowRunning &= ~(SHADOWDONE | SHADOWGO);
+}
+
+void shadowExit() {
+	if (shadowRunning & SHADOWWAIT) {
+		//shell_log("Transition from ShadowWait to ShadowDone (in exit)");
+		shadowRunning &= ~SHADOWWAIT;
+		shadowRunning |= SHADOWDONE;
+		if (running) {
+			// Running may have been activated during shadow (e.g. key pressed...
+			//shell_log("Already running, nothing to do (in exit)");
+		}
+		else if (shadowRunning & SHADOWRUNONCE) {
+			//shell_log("Re-enable running (in exit)");
+			running = 1;
+			shadowRunning &= ~SHADOWRUNONCE;
+		}
+		else {
+			//shell_log("Set ShadowGo (in exit)");
+			shadowRunning |= SHADOWGO;
+		}
+	}
+}
 
 static int shell_init_IP() {
 	char ipStrBuf[16];
@@ -516,7 +577,7 @@ static int shell_init_IP() {
 }
 
 int shell_write_IP(int tx) {
-	int err;
+	int err = 1;
 	char buf[2];
 	// send data
 	buf[0] = (char)(tx >> 8 & 0xff);
@@ -525,55 +586,12 @@ int shell_write_IP(int tx) {
 	//sprintf(ipStrBuf,"send %04x\n", tx);
 	//shell_write_console(ipStrBuf);
 	if (err == SOCKET_ERROR) {
-		err = 0;
 		clientSocket = SOCKET_ERROR;
 	}
 	else {
-		err = 1;
+		err = 0;
 	}
 	return err;
-}
-
-int shell_read_IP(int *rx) {
-	//char ipStrBuf[16];
-	DWORD wsaEvent;
-	WSANETWORKEVENTS  wsaNetworkEvents;
-	SOCKADDR callerAddr;
-	int l;
-	int frameok=0;
-	char buf[2];
-
-	wsaEvent = WSAWaitForMultipleEvents(2, serverEvent, false, 2, false);
-	switch (wsaEvent) {
-		case WSA_WAIT_FAILED :
-		case WAIT_IO_COMPLETION :
-		case WSA_WAIT_TIMEOUT :
-			break;
-		default :
-			wsaEvent-= WSA_WAIT_EVENT_0;
-			if (WSAEnumNetworkEvents(serverSocket[wsaEvent], serverEvent[wsaEvent], &wsaNetworkEvents) != SOCKET_ERROR) {
-				if (wsaNetworkEvents.lNetworkEvents & FD_ACCEPT) {
-					l = sizeof(callerAddr);
-					serverSocket[wsaEvent+1] = accept(serverSocket[wsaEvent], &callerAddr, &l);
-					WSAEventSelect(serverSocket[wsaEvent+1], serverEvent[wsaEvent+1], FD_CLOSE | FD_READ);
-				}
-				if (wsaNetworkEvents.lNetworkEvents & FD_CLOSE) {
-					closesocket(serverSocket[wsaEvent]);
-					serverSocket[0] = SOCKET_ERROR;
-				}
-				if (wsaNetworkEvents.lNetworkEvents & FD_READ) {
-					frameok = recv(serverSocket[wsaEvent], buf, sizeof(buf), 0);
-					*rx = (buf[0] << 8);
-					*rx |= (unsigned char)buf[1];
-					//sprintf(ipStrBuf,"recv %04x\n", *rx);
-					//shell_write_console(ipStrBuf);
-				}
-			}
-			else {
-				serverSocket[0] = SOCKET_ERROR;
-			}
-	}
-	return frameok;
 }
 
 static void shell_close_IP() {
@@ -636,6 +654,7 @@ int shell_write_serial(int tx) {
 	DWORD lasterror;
 	char buf[2];
 	char buflen = 0;
+	int err = 1;
 
 	if ((tx != 0x496) && (tx != 0x494) && (tx != 0x497)) {
 		//aff_frame(data,1);
@@ -657,50 +676,11 @@ int shell_write_serial(int tx) {
 		lasterror = GetLastError();
 		shell_close_serial();
 		hSerial = NULL;
-		printf("Error %d sending %s\n", lasterror, buf);
 	}
-	return 1;
-}
-
-int shell_read_serial(int *rx) {
-	DWORD result;
-	char buf;
-	int frame;
-	int frameok=0;
-
-	if (hSerial == NULL) {
-		return frameok;
+	else {
+		err = 0;
 	}
-	ReadFile(hSerial, &buf, 1, &result, NULL);
-	if (result != 0) {
-		// emu41 <-> ilser read sync
-		if (buf == 0x0d) {
-			//Serial.println("Ignore sync");
-		}
-		// test for msb's frame
-		else if ((buf & highbytesigmsk) == highbytesig) {
-			//Serial.print(" High part ");
-			//Serial.print(buf, HEX);
-			_lastFrame = (buf & highbytevalmsk) << 6;
-		}
-		// test for lsb's frame
-		else if ((buf & lowbytesigmsk) == lowbytesig) {
-			frame = _lastFrame | (buf & lowbytevalmsk);
-			//if ((frame != 0x496) && (frame != 0x494) && (frame != 0x497)) {
-				//Serial.print(" Low part ");
-				//Serial.print(buf, HEX);
-				frameok = 1;
-				*rx = frame;
-				//aff_frame(_frame,0);
-			//}
-			// ilser commands
-			//else {
-				//Serial.println("Bypass");
-				//	shell_write_frame(frame);
-			//}
-		}
-	}
-	return(frameok); 
+	return err;
 }
 
 static void shell_close_serial() {
@@ -740,7 +720,7 @@ int shell_check_connectivity(void) {
 			shell_close_IP();
 			if (shell_init_IP()) {
 				err = ERR_BROKEN_LOOP;
-			};
+			}
 		}
 	}
 	else if (hSerial == NULL) {
@@ -751,22 +731,142 @@ int shell_check_connectivity(void) {
 	return err;
 }
 
-int shell_write_frame(int tx) {
+/*
+ * shell_write_frame
+ *
+ * send frame
+ */
+int shell_write_frame(int frameTx) {
+	int err = 0;
+	//char tmp[20];
+	//sprintf(tmp,"TX %.4x",frameTx);
+	//shell_log(tmp);
 	if (modeIP) {
-		return shell_write_IP(tx);
+		err = shell_write_IP(frameTx);
 	}
 	else {
-		return shell_write_serial(tx);
+		err = shell_write_serial(frameTx);
 	}
+	return err;
 }
 
-int shell_read_frame(int *rx) {
-	if (modeIP) {
-		return shell_read_IP(rx);
+/*
+ * shell_read_frame
+ *
+ * pseudo async frame receive
+ * if frame available -> return frameOk = 1
+ * if frame not available -> return frameOk = 0
+ *						  -> start timer and polling in background
+ *						  -> caller must go in error_idle
+ * if timeout > 0 -> intial call by hpilworker 
+ * if timeout < 0 -> callback
+ */
+int shell_read_frame(int *rx, int timeout) {
+	DWORD result;
+	WSANETWORKEVENTS  wsaNetworkEvents;
+	SOCKADDR callerAddr;
+	int l, frameRx, frameOk=0;
+	char buf[2];
+	int nextTimer = 10;
+	char tmp[32];
+	if (rx == NULL) {
+		// request only timeout
+		//shell_log("Fake Rx, timer request");
+		timeout = 1;
+		nextTimer = 1000;
+	}
+	else if (modeIP) {
+		// read from socket
+		result = WSAWaitForMultipleEvents(2, serverEvent, false, 10, false);
+		switch (result) {
+			case WSA_WAIT_FAILED :
+				//shell_log("IP Rx - WSA_WAIT_FAILED");
+				break;
+			case WAIT_IO_COMPLETION :
+				//shell_log("IP Rx - WAIT_IO_COMPLETION");
+				break;
+			case WSA_WAIT_TIMEOUT :
+				//shell_log("IP Rx - WSA_WAIT_TIMEOUT");
+				break;
+			default :
+				result-= WSA_WAIT_EVENT_0;
+				if (WSAEnumNetworkEvents(serverSocket[result], serverEvent[result], &wsaNetworkEvents) != SOCKET_ERROR) {
+					if (wsaNetworkEvents.lNetworkEvents & FD_ACCEPT) {
+						// accepting new connection
+						//shell_log("IP Rx - new connection");
+						l = sizeof(callerAddr);
+						serverSocket[result+1] = accept(serverSocket[result], &callerAddr, &l);
+						WSAEventSelect(serverSocket[result+1], serverEvent[result+1], FD_CLOSE | FD_READ);
+					}
+					if (wsaNetworkEvents.lNetworkEvents & FD_CLOSE) {
+						// closing socket
+						//shell_log("IP Rx - close socket");
+						closesocket(serverSocket[result]);
+						serverSocket[0] = SOCKET_ERROR;
+					}
+					if (wsaNetworkEvents.lNetworkEvents & FD_READ) {
+						// data received
+						//shell_log("IP Rx - frame received");
+						frameOk = recv(serverSocket[result], buf, sizeof(buf), 0);
+						frameRx = (buf[0] << 8);
+						frameRx |= (unsigned char)buf[1];
+					}
+				}
+				else {
+					serverSocket[0] = SOCKET_ERROR;
+				}
+		}
 	}
 	else {
-		return shell_read_serial(rx);
+		// read from com port
+		if (hSerial != NULL) {
+			ReadFile(hSerial, &buf, 1, &result, NULL);
+			if (result != 0) {
+				if ((buf[0] & highbytesigmsk) == highbytesig) {
+					// msb frame
+					//shell_log("serial Rx - msb frame");
+					_lastFrame = (buf[0] & highbytevalmsk) << 6;
+					// wait lsb frame
+					ReadFile(hSerial, &buf, 1, &result, NULL);
+					if (result != 0 && ((buf[0] & lowbytesigmsk) == lowbytesig)) {
+						//shell_log("serial Rx - next lsb frame");
+						frameRx = _lastFrame | (buf[0] & lowbytevalmsk);
+						frameOk = 1;
+					}
+					else {
+						//shell_log("serial Rx - next ignored");
+					}
+				}
+				else if ((buf[0] & lowbytesigmsk) == lowbytesig) {
+					//shell_log("serial Rx - lsb frame");
+					// late lsb's frame
+					frameRx = _lastFrame | (buf[0] & lowbytevalmsk);
+					frameOk = 1;
+				}
+				else {
+					//shell_log("serial Rx - ignored");
+				}
+			}
+		}
 	}
+	if (frameOk) {
+		//sprintf(tmp,"Rx %.4x done",frameRx);
+		//shell_log(tmp);
+		shadowExit();
+		*rx = frameRx;
+	}
+	else if (timeout > 0) {
+		// first call from hpil_worker
+		sprintf(tmp,"Rx Timout %d",timeout);
+		shell_log(tmp);
+		shadowEnter();
+		maxLoop = 1 + (timeout / 20);
+		timerZ = SetTimer(NULL, 0, nextTimer, timeoutZ);
+	}
+	else {
+		//shell_log("Rx failed, no retry");
+	}
+	return (frameOk);
 }
 
 static void shell_close_port() {
@@ -775,6 +875,41 @@ static void shell_close_port() {
 	shell_close_serial();
 }
 
-void shell_write_console (char *msg) {
-	OutputDebugString(msg);
+static VOID CALLBACK timeoutZ(HWND hwnd, UINT uMsg, UINT idEvent, DWORD dwTime) {
+    KillTimer(NULL, timerZ);
+    timerZ = 0;
+	//char tmp[25];
+	//sprintf(tmp,"maxloop %d",maxLoop);
+	//shell_log(tmp);
+	if (--maxLoop == 0) {
+		// waiting loop return timed out
+		// need to break the loop...
+		//shell_log("Rx timeout");
+		shadowExit(); 
+		hpil_rxWorker(0, 0);
+	}
+	else {
+		// give it another try 
+		if (!SendMessageCallback(hMainWnd, WM_USER_RxFrame, 0, 0, processRxFrame, NULL)) {
+			// internal error, same as timeout
+			MessageBox(hMainWnd, "HPIL Loop management rx error !", "free42 eXtensions", MB_ICONERROR);
+			// need to break the loop...
+			shadowExit();
+			hpil_rxWorker(0, 0);
+		}
+	}
+}
+
+static VOID CALLBACK processRxFrame(HWND hwnd, UINT uMsg, ULONG_PTR dwData, LRESULT lResult) {
+	int frameOk, frameRx;
+	int nextTimer = 10;
+	frameOk = shell_read_frame(&frameRx, -1);
+	if (frameOk) {
+		//shell_log("Callback Rx done");
+		hpil_rxWorker(frameOk, frameRx);
+	}
+	else {
+		//shell_log("Callback Launch timer");
+		timerZ = SetTimer(NULL, 0, nextTimer, timeoutZ);
+	}
 }

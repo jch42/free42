@@ -168,6 +168,19 @@ MassStorage s;
 extern AltBuf hpil_controllerAltBuf;
 extern DataBuf hpil_controllerDataBuf;
 
+static int defrd_create(int error);
+static int defrd_dir(int error);
+static int defrd_newm(int error);
+static int defrd_purge(int error);
+static int defrd_readp(int error);
+static int defrd_readr(int error);
+static int defrd_rename(int error);
+static int defrd_sec(int error);
+static int defrd_unsec(int error);
+static int defrd_wrtr(int error);
+static int defrd_wrtp(int error);
+static int defrd_zero(int error);
+
 static int hpil_newm_completion(int error);
 static int hpil_massGenericReadWrite_completion(int error);
 
@@ -287,152 +300,220 @@ void flush_phloatOrString(uint8_t *target, phloat* val, char isString) {
  */
 
 int docmd_create(arg_struct *arg) {
-	int i;
 	int err;
 	err = hpil_check();
-	if (err != ERR_NONE) {
+	if (err == ERR_OVERLAPED_OPERATION) {
+		mode_interruptible = defrd_create;
+		return ERR_INTERRUPTIBLE;
+	}
+	else if (err != ERR_NONE) {
 		return err;
 	}
-	if (reg_alpha_length < 1) {
-		return ERR_ALPHA_DATA_IS_INVALID;
-	}
-	if (mappable_x_hpil(65535,&s.fLength) != ERR_NONE || s.fLength == 0) {
-		err = ERR_INVALID_DATA;
-	}
-	s.fBlocks = ((BLOCK_SZ / REGS_SZ) - 1 + s.fLength)  / (BLOCK_SZ / REGS_SZ);
-	for (i = 0; i < 10; i++) {
-		if (i < reg_alpha_length) {
-			s.fName[i] = reg_alpha[i];
+	return defrd_create(ERR_NONE);
+}
+
+static int defrd_create(int error) {
+	int i;
+	if (error == ERR_NONE) {
+		if (reg_alpha_length < 1) {
+			return ERR_ALPHA_DATA_IS_INVALID;
 		}
-		else {
-			s.fName[i] = ' ';
+		if (mappable_x_hpil(65535,&s.fLength) != ERR_NONE || s.fLength == 0) {
+			return ERR_INVALID_DATA;
 		}
+		error = ERR_INTERRUPTIBLE;
+		s.fBlocks = ((BLOCK_SZ / REGS_SZ) - 1 + s.fLength)  / (BLOCK_SZ / REGS_SZ);
+		for (i = 0; i < 10; i++) {
+			if (i < reg_alpha_length) {
+				s.fName[i] = reg_alpha[i];
+			}
+			else {
+				s.fName[i] = ' ';
+			}
+		}
+		s.hpil_processBuffer = hpil_createRefreshBuf;
+		s.cmdType = TypeCreate;
+		s.fType = 0xe0d0;
+		s.fTypeMask = 0xffff;
+		s.fAttr = 0x00;
+		s.fAttrMask = 0xff;
+		hpil_settings.disk = hpil_settings.selected;
+		ILCMD_IDY(1);
+		hpil_step = 0;
+		hpil_completion = hpil_massGenericReadWrite_completion;
+		mode_interruptible = hpil_worker;
+		mode_stoppable = false;
 	}
-	s.hpil_processBuffer = hpil_createRefreshBuf;
-	s.cmdType = TypeCreate;
-	s.fType = 0xe0d0;
-	s.fTypeMask = 0xffff;
-	s.fAttr = 0x00;
-	s.fAttrMask = 0xff;
-	hpil_settings.disk = hpil_settings.selected;
-	ILCMD_IDY(1);
-	hpil_step = 0;
-	hpil_completion = hpil_massGenericReadWrite_completion;
-	mode_interruptible = hpil_worker;
-	return ERR_INTERRUPTIBLE;
+	return error;
 }
 
 int docmd_dir(arg_struct *arg) {
 	int err;
 	err = hpil_check();
-	if (err != ERR_NONE) {
+	if (err == ERR_OVERLAPED_OPERATION) {
+		mode_interruptible = defrd_dir;
+		return ERR_INTERRUPTIBLE;
+	}
+	else if (err != ERR_NONE) {
 		return err;
 	}
-	s.cmdType = 0x0000;
-	s.fType = 0x0000;
-	s.fTypeMask = 0x0000;
-	s.fAttr = 0x00;	// do we need to care ?
-	hpil_settings.disk = hpil_settings.selected;
-	ILCMD_IDY(1);
-	hpil_step = 0;
-	hpil_completion = hpil_massGenericReadWrite_completion;
-	mode_interruptible = hpil_worker;
+	return defrd_dir(ERR_NONE);
+}
+
+static int defrd_dir(int error) {
+	if (error == ERR_NONE) {
+		error = ERR_INTERRUPTIBLE;
+		s.cmdType = 0x0000;
+		s.fType = 0x0000;
+		s.fTypeMask = 0x0000;
+		s.fAttr = 0x00;	// do we need to care ?
+		hpil_settings.disk = hpil_settings.selected;
+		ILCMD_IDY(1);
+		hpil_step = 0;
+		hpil_completion = hpil_massGenericReadWrite_completion;
+		mode_interruptible = hpil_worker;
+		mode_stoppable = true;
+	}
 	return ERR_INTERRUPTIBLE;
 }
 
 int docmd_newm(arg_struct *arg) {
-	int i;
 	int err;
 	err = hpil_check();
-	if (err != ERR_NONE) {
-		return err;
-	}
-	if (arg->type != ARGTYPE_NUM) {
-		return ERR_INVALID_TYPE;
-	}
-	s.dirBlocklen = (arg->val.num + 8) / 8;
-	for (i = 0; i < 6; i++) {
-		if (i < reg_alpha_length) {
-			s.volume[i] = reg_alpha[i];
+	if (err == ERR_NONE || err == ERR_OVERLAPED_OPERATION) {
+		if (arg->type != ARGTYPE_NUM) {
+			return ERR_INVALID_TYPE;
 		}
 		else {
-			s.volume[i] = ' ';
+			s.dirBlocklen = (arg->val.num + 8) / 8;
+			if (err == ERR_OVERLAPED_OPERATION) {
+				mode_interruptible = defrd_newm;
+				err = ERR_INTERRUPTIBLE;
+			}
+			else {
+				err = defrd_newm(ERR_NONE);
+			}
 		}
 	}
-	ILCMD_IDY(1);
-	hpil_step = 0;
-	hpil_completion = hpil_newm_completion;
-	mode_interruptible = hpil_worker;
-	return ERR_INTERRUPTIBLE;
+	return err;
+}
+
+static int defrd_newm(int error) {
+	int i;
+	if (error == ERR_NONE) {
+		error = ERR_INTERRUPTIBLE;
+		for (i = 0; i < 6; i++) {
+			if (i < reg_alpha_length) {
+				s.volume[i] = reg_alpha[i];
+			}
+			else {
+				s.volume[i] = ' ';
+			}
+		}
+		ILCMD_IDY(1);
+		hpil_step = 0;
+		hpil_completion = hpil_newm_completion;
+		mode_interruptible = hpil_worker;
+		mode_stoppable = false;
+	}
+	return error;
 }
 
 int docmd_purge(arg_struct *arg) {
-	int i;
 	int err;
 	err = hpil_check();
-	if (err != ERR_NONE) {
+	if (err == ERR_OVERLAPED_OPERATION) {
+		mode_interruptible = defrd_purge;
+		return ERR_INTERRUPTIBLE;
+	}
+	else if (err != ERR_NONE) {
 		return err;
 	}
-	if (reg_alpha_length < 1) {
-		return  ERR_ALPHA_DATA_IS_INVALID;
-	}
-	for (i = 0; i < 10; i++) {
-		if (i < reg_alpha_length) {
-			s.fName[i] = reg_alpha[i];
+	return defrd_purge(ERR_NONE);
+}
+
+static int defrd_purge(int error) {
+	int i;
+	if (error == ERR_NONE) {
+		if (reg_alpha_length < 1) {
+			error = ERR_ALPHA_DATA_IS_INVALID;
 		}
 		else {
-			s.fName[i] = ' ';
+			error = ERR_INTERRUPTIBLE;
+			for (i = 0; i < 10; i++) {
+				if (i < reg_alpha_length) {
+					s.fName[i] = reg_alpha[i];
+				}
+				else {
+					s.fName[i] = ' ';
+				}
+			}
+			s.hpil_processBuffer = 0;
+			s.cmdType = TypeUpdate | TypePurge;
+			s.fType = 0x0000;
+			s.fTypeMask = 0x0000;
+			s.fAttr = 0x00;
+			s.fAttrMask = 0xff;
+			hpil_settings.disk = hpil_settings.selected;
+			ILCMD_IDY(1);
+			hpil_step = 0;
+			hpil_completion = hpil_massGenericReadWrite_completion;
+			mode_interruptible = hpil_worker;
+			mode_stoppable = false;
 		}
 	}
-	s.hpil_processBuffer = 0;
-	s.cmdType = TypeUpdate | TypePurge;
-	s.fType = 0x0000;
-	s.fTypeMask = 0x0000;
-	s.fAttr = 0x00;
-	s.fAttrMask = 0xff;
-	hpil_settings.disk = hpil_settings.selected;
-	ILCMD_IDY(1);
-	hpil_step = 0;
-	hpil_completion = hpil_massGenericReadWrite_completion;
-	mode_interruptible = hpil_worker;
-	return ERR_INTERRUPTIBLE;
+	return error;
 }
 
 int docmd_readp(arg_struct *arg) {
-	int i;
 	int err;
 	err = hpil_check();
-	if (err != ERR_NONE) {
+	if (err == ERR_OVERLAPED_OPERATION) {
+		mode_interruptible = defrd_readp;
+		return ERR_INTERRUPTIBLE;
+	}
+	else if (err != ERR_NONE) {
 		return err;
 	}
-	if (reg_alpha_length < 1) {
-		return ERR_ALPHA_DATA_IS_INVALID;
-	}
-	for (i = 0; i < 10; i++) {
-		if (i < reg_alpha_length) {
-			s.fName[i] = reg_alpha[i];
+	return defrd_readp(ERR_NONE);
+}
+
+static int defrd_readp(int error) {
+	int i;
+	if (error == ERR_NONE) {
+		if (reg_alpha_length < 1) {
+			error = ERR_ALPHA_DATA_IS_INVALID;
 		}
 		else {
-			s.fName[i] = ' ';
+			error = ERR_INTERRUPTIBLE;
+			for (i = 0; i < 10; i++) {
+				if (i < reg_alpha_length) {
+					s.fName[i] = reg_alpha[i];
+				}
+				else {
+					s.fName[i] = ' ';
+				}
+			}
+			// set ftype & mask, cmd
+			s.hpil_processBuffer = hpil_readpRefreshBuf;
+			s.cmdType = TypeRead;
+			s.fType = 0xe080;
+			s.fTypeMask = 0xffff;
+			// WHY ??? set_running(false);
+			// Set print mode to MAN during the import, to prevent store_command()
+			// from printing programs as they load, though vey usefull for troubleshooting !
+			s.trace = flags.f.trace_print;
+			s.normal = flags.f.normal_print;
+			flags.f.trace_print = 0;
+			flags.f.normal_print = 0;
+			ILCMD_IDY(1);
+			hpil_step = 0;
+			hpil_completion = hpil_massGenericReadWrite_completion;
+			mode_interruptible = hpil_worker;
+			mode_stoppable = false;
 		}
 	}
-	// set ftype & mask, cmd
-	s.hpil_processBuffer = hpil_readpRefreshBuf;
-	s.cmdType = TypeRead;
-	s.fType = 0xe080;
-	s.fTypeMask = 0xffff;
-	// WHY ??? set_running(false);
-	// Set print mode to MAN during the import, to prevent store_command()
-	// from printing programs as they load, though vey usefull for troubleshooting !
-	s.trace = flags.f.trace_print;
-	s.normal = flags.f.normal_print;
-	flags.f.trace_print = 0;
-	flags.f.normal_print = 0;
-	ILCMD_IDY(1);
-	hpil_step = 0;
-	hpil_completion = hpil_massGenericReadWrite_completion;
-	mode_interruptible = hpil_worker;
-	return ERR_INTERRUPTIBLE;
+	return error;
 }
 
 /* docmd_readr
@@ -446,214 +527,282 @@ int docmd_readp(arg_struct *arg) {
 int docmd_readr(arg_struct *arg) {
 	int err;
 	err = hpil_check();
-	if (err != ERR_NONE) {
+	if (err == ERR_OVERLAPED_OPERATION) {
+		mode_interruptible = defrd_readr;
+		return ERR_INTERRUPTIBLE;
+	}
+	else if (err != ERR_NONE) {
 		return err;
 	}
-	// check alpha format
-	err = hpil_splitAlphaReg(SPLIT_MODE_VAR);
-	if (err != ERR_NONE) {
-		return err;
-	}
-	// set ftype & mask, cmd
-	s.hpil_processBuffer = hpil_readrRefreshBuf;
-	s.cmdType = TypeRead;
-	strncpy(s.fName, alphaSplit.str1, alphaSplit.len1);
-	s.fType = 0xe0d8;
-	s.fTypeMask = 0xfff0;
-	s.namedVar = 0;
-	// setup against input mode
-	if (alphaSplit.len2 == 0) {
-		// hp-41c readr style only, to REGS, all checks to be done later
-		s.r.reg = recall_var("REGS", 4);
-		if (s.r.reg == NULL) {
-			return ERR_NONEXISTENT;
+	return defrd_readr(ERR_NONE);
+}
+
+static int defrd_readr(int error) {
+	if (error == ERR_NONE) {
+		error = hpil_splitAlphaReg(SPLIT_MODE_VAR);
+		if (error == ERR_NONE) { 
+			// set ftype & mask, cmd
+			s.hpil_processBuffer = hpil_readrRefreshBuf;
+			s.cmdType = TypeRead;
+			strncpy(s.fName, alphaSplit.str1, alphaSplit.len1);
+			s.fType = 0xe0d8;
+			s.fTypeMask = 0xfff0;
+			s.namedVar = 0;
+			// setup against input mode
+			if (alphaSplit.len2 == 0) {
+				// hp-41c readr style only, to REGS, all checks to be done later
+				s.r.reg = recall_var("REGS", 4);
+				if (s.r.reg == NULL) {
+					error = ERR_NONEXISTENT;
+				}
+				s.fType = 0xe0d0;
+				s.fTypeMask = 0xffff;
+			}
+			else if ((alphaSplit.len2 != 1) || (alphaSplit.str2[0] != '*')) {
+				s.r.reg = recall_var(alphaSplit.str2, alphaSplit.len2);
+				s.namedVar = 1;
+				strncpy(s.vheader.name, alphaSplit.str2, alphaSplit.len2);
+				s.vheader.nameLen = alphaSplit.len2;
+				s.fTypeMask = 0xfff0;
+			}
+			else {
+				error = ERR_ALPHA_DATA_IS_INVALID;
+			}
+			if (error == ERR_NONE) {
+				error = ERR_INTERRUPTIBLE;
+				ILCMD_IDY(1);
+				hpil_step = 0;
+				hpil_completion = hpil_massGenericReadWrite_completion;
+				mode_interruptible = hpil_worker;
+				mode_stoppable = false;
+			}
 		}
-		s.fType = 0xe0d0;
-		s.fTypeMask = 0xffff;
 	}
-	else if ((alphaSplit.len2 != 1) || (alphaSplit.str2[0] != '*')) {
-		s.r.reg = recall_var(alphaSplit.str2, alphaSplit.len2);
-		s.namedVar = 1;
-		strncpy(s.vheader.name, alphaSplit.str2, alphaSplit.len2);
-		s.vheader.nameLen = alphaSplit.len2;
-		s.fTypeMask = 0xfff0;
-	}
-	ILCMD_IDY(1);
-	hpil_step = 0;
-	hpil_completion = hpil_massGenericReadWrite_completion;
-	mode_interruptible = hpil_worker;
-	return ERR_INTERRUPTIBLE;
+	return error;
 }
 
 int docmd_rename(arg_struct *arg) {
 	int err;
 	err = hpil_check();
-	if (err != ERR_NONE) {
+	if (err == ERR_OVERLAPED_OPERATION) {
+		mode_interruptible = defrd_rename;
+		return ERR_INTERRUPTIBLE;
+	}
+	else if (err != ERR_NONE) {
 		return err;
 	}
-	// check alpha format
-	err = hpil_splitAlphaReg(SPLIT_MODE_VAR | SPLIT_MODE_PRGM);
-	if (err != ERR_NONE) {
-		return err;
+	return defrd_rename(ERR_NONE);
+}
+
+static int defrd_rename(int error) {
+	if (error == ERR_NONE) {
+		// check alpha format
+		error = hpil_splitAlphaReg(SPLIT_MODE_VAR | SPLIT_MODE_PRGM);
+		if (error == ERR_NONE) {
+			if (alphaSplit.len1 < 1 || alphaSplit.len2 < 1) {
+				error = ERR_ALPHA_DATA_IS_INVALID;
+			}
+			else {
+				error = ERR_INTERRUPTIBLE;
+				s.hpil_processBuffer = 0;
+				s.cmdType = TypeUpdate | TypeRename;
+				s.fType = 0xe000;
+				s.fTypeMask = 0xf000;
+				s.fAttr = 0x00;
+				s.fAttrMask = 0xff;
+				strncpy(s.fName, alphaSplit.str1, 10);
+				strncpy(s.fRename, alphaSplit.str2, 10);
+				hpil_settings.disk = hpil_settings.selected;
+				ILCMD_IDY(1);
+				hpil_step = 0;
+				hpil_completion = hpil_massGenericReadWrite_completion;
+				mode_interruptible = hpil_worker;
+				mode_stoppable = false;
+			}
+		}
 	}
-	if (alphaSplit.len1 < 1 || alphaSplit.len2 < 1) {
-		return ERR_ALPHA_DATA_IS_INVALID;
-	}
-	s.hpil_processBuffer = 0;
-	s.cmdType = TypeUpdate | TypeRename;
-	s.fType = 0xe000;
-	s.fTypeMask = 0xf000;
-	s.fAttr = 0x00;
-	s.fAttrMask = 0xff;
-	strncpy(s.fName, alphaSplit.str1, 10);
-	strncpy(s.fRename, alphaSplit.str2, 10);
-	hpil_settings.disk = hpil_settings.selected;
-	ILCMD_IDY(1);
-	hpil_step = 0;
-	hpil_completion = hpil_massGenericReadWrite_completion;
-	mode_interruptible = hpil_worker;
-	return ERR_INTERRUPTIBLE;
+	return error;
 }
 
 int docmd_sec(arg_struct *arg) {
-	int i;
 	int err;
 	err = hpil_check();
-	if (err != ERR_NONE) {
+	if (err == ERR_OVERLAPED_OPERATION) {
+		mode_interruptible = defrd_sec;
+		return ERR_INTERRUPTIBLE;
+	}
+	else if (err != ERR_NONE) {
 		return err;
 	}
-	if (reg_alpha_length < 1) {
-		return ERR_ALPHA_DATA_IS_INVALID;
-	}
-	for (i = 0; i < 10; i++) {
-		if (i < reg_alpha_length) {
-			s.fName[i] = reg_alpha[i];
+	return defrd_sec(ERR_NONE);
+}
+
+static int defrd_sec(int error) {
+	int i;
+	if (error == ERR_NONE) {
+		if (reg_alpha_length < 1) {
+			error = ERR_ALPHA_DATA_IS_INVALID;
 		}
 		else {
-			s.fName[i] = ' ';
+			error = ERR_INTERRUPTIBLE;
+			for (i = 0; i < 10; i++) {
+				if (i < reg_alpha_length) {
+					s.fName[i] = reg_alpha[i];
+				}
+				else {
+					s.fName[i] = ' ';
+				}
+			}
+			s.hpil_processBuffer = 0;
+			s.cmdType = TypeUpdate;
+			s.fType = 0xe000;
+			s.fTypeMask = 0xf000;
+			s.fAttr = FlagSecured;
+			s.fAttrMask = ~FlagSecured;
+			hpil_settings.disk = hpil_settings.selected;
+			ILCMD_IDY(1);
+			hpil_step = 0;
+			hpil_completion = hpil_massGenericReadWrite_completion;
+			mode_interruptible = hpil_worker;
+			mode_stoppable = false;
 		}
 	}
-	s.hpil_processBuffer = 0;
-	s.cmdType = TypeUpdate;
-	s.fType = 0xe000;
-	s.fTypeMask = 0xf000;
-	s.fAttr = FlagSecured;
-	s.fAttrMask = ~FlagSecured;
-	hpil_settings.disk = hpil_settings.selected;
-	ILCMD_IDY(1);
-	hpil_step = 0;
-	hpil_completion = hpil_massGenericReadWrite_completion;
-	mode_interruptible = hpil_worker;
-    return ERR_INTERRUPTIBLE;
+    return error;
 }
 
 int docmd_unsec(arg_struct *arg) {
-	int i;
 	int err;
 	err = hpil_check();
-	if (err != ERR_NONE) {
+	if (err == ERR_OVERLAPED_OPERATION) {
+		mode_interruptible = defrd_unsec;
+		return ERR_INTERRUPTIBLE;
+	}
+	else if (err != ERR_NONE) {
 		return err;
 	}
-	if (reg_alpha_length < 1) {
-		return ERR_ALPHA_DATA_IS_INVALID;
-	}
-	for (i = 0; i < 10; i++) {
-		if (i < reg_alpha_length) {
-			s.fName[i] = reg_alpha[i];
+	return defrd_unsec(ERR_NONE);
+}
+
+static int defrd_unsec(int error) {
+	int i;
+	if (error == ERR_NONE) {
+		if (reg_alpha_length < 1) {
+			error = ERR_ALPHA_DATA_IS_INVALID;
 		}
 		else {
-			s.fName[i] = ' ';
+			error = ERR_INTERRUPTIBLE;
+			for (i = 0; i < 10; i++) {
+				if (i < reg_alpha_length) {
+					s.fName[i] = reg_alpha[i];
+				}
+				else {
+					s.fName[i] = ' ';
+				}
+			}
+			s.hpil_processBuffer = 0;
+			s.cmdType = TypeUpdate;
+			s.fType = 0xE000;
+			s.fTypeMask = 0xF000;
+			s.fAttr = 0x00;
+			s.fAttrMask = ~FlagSecured;
+			hpil_settings.disk = hpil_settings.selected;
+			ILCMD_IDY(1);
+			hpil_step = 0;
+			hpil_completion = hpil_massGenericReadWrite_completion;
+			mode_interruptible = hpil_worker;
+			mode_stoppable = false;
 		}
 	}
-	s.hpil_processBuffer = 0;
-	s.cmdType = TypeUpdate;
-	s.fType = 0xE000;
-	s.fTypeMask = 0xF000;
-	s.fAttr = 0x00;
-	s.fAttrMask = ~FlagSecured;
-	hpil_settings.disk = hpil_settings.selected;
-	ILCMD_IDY(1);
-	hpil_step = 0;
-	hpil_completion = hpil_massGenericReadWrite_completion;
-	mode_interruptible = hpil_worker;
-	return ERR_INTERRUPTIBLE;
+	return error;
 }
 
 int docmd_wrtp(arg_struct *arg) {
+	int err;
+	err = hpil_check();
+	if (err == ERR_OVERLAPED_OPERATION) {
+		mode_interruptible = defrd_wrtp;
+		return ERR_INTERRUPTIBLE;
+	}
+	else if (err != ERR_NONE) {
+		return err;
+	}
+	return defrd_wrtp(ERR_NONE);
+}
+
+static int defrd_wrtp(int error) {
 	int prgm;
 	int4 pc;
-	int i, j, err;
+	int i, j;
 	arg_struct arg_s;
-
-	err = hpil_check();
-	if (err != ERR_NONE) {
-		return err;
-	}
-	err = hpil_splitAlphaReg(SPLIT_MODE_PRGM);
-	if (err != ERR_NONE) {
-		return err;
-	}
-	s.saved_prgm = -1;
-	if (alphaSplit.len1 != 0) {
-		arg_s.type = TYPE_STRING;
-		arg_s.length = (alphaSplit.len1 > 7) ? 7 : alphaSplit.len1;
-		for (i = 0; i < arg_s.length; i++) {
-			arg_s.val.text[i] = alphaSplit.str1[i];
-			s.fName[i] = alphaSplit.str1[i];
-		}
-		for (i; i < 10; i++) {
-			s.fName[i] = ' ';
-		}
-		if (find_global_label(&arg_s, &prgm, &pc)) {
-			s.saved_prgm = current_prgm;
-			current_prgm = prgm;
-		}
-		else {
-			return ERR_LABEL_NOT_FOUND;
-		}
-	}
-	if (alphaSplit.len2 != 0) {
-		for (i = 0; i < alphaSplit.len2; i++) {
-			s.fName[i] = alphaSplit.str2[i];
-		}
-	}
-	else {
-		if (alphaSplit.len1 == 0) {
-			// no label, nor name, build name from first lable of current prgm
-			err = ERR_LABEL_NOT_FOUND;
-			i = 0;
-			do {
-				if (labels[i].prgm == current_prgm) {
-					for (j = 0; j < labels[i].length; j++) {
-						s.fName[j] = labels[i].name[j];
-					}
-					for (j; j < 10; j++) {
-						s.fName[j] = ' ';
-					}
-					err = ERR_NONE;
+	if (error == ERR_NONE) {
+		error = hpil_splitAlphaReg(SPLIT_MODE_PRGM);
+		if (error == ERR_NONE) {
+			s.saved_prgm = -1;
+			if (alphaSplit.len1 != 0) {
+				arg_s.type = TYPE_STRING;
+				arg_s.length = (alphaSplit.len1 > 7) ? 7 : alphaSplit.len1;
+				for (i = 0; i < arg_s.length; i++) {
+					arg_s.val.text[i] = alphaSplit.str1[i];
+					s.fName[i] = alphaSplit.str1[i];
 				}
-			} while (++i < labels_count && err != ERR_NONE);
+				for (i; i < 10; i++) {
+					s.fName[i] = ' ';
+				}
+				if (find_global_label(&arg_s, &prgm, &pc)) {
+					s.saved_prgm = current_prgm;
+					current_prgm = prgm;
+				}
+				else {
+					error = ERR_LABEL_NOT_FOUND;
+				}
+			}
+			if (error == ERR_NONE) {
+				if (alphaSplit.len2 != 0) {
+					for (i = 0; i < alphaSplit.len2; i++) {
+						s.fName[i] = alphaSplit.str2[i];
+					}
+				}
+				else {
+					if (alphaSplit.len1 == 0) {
+						// no label, nor name, build name from first lable of current prgm
+						error = ERR_LABEL_NOT_FOUND;
+						i = 0;
+						do {
+							if (labels[i].prgm == current_prgm) {
+								for (j = 0; j < labels[i].length; j++) {
+									s.fName[j] = labels[i].name[j];
+								}
+								for (j; j < 10; j++) {
+									s.fName[j] = ' ';
+								}
+								error = ERR_NONE;
+							}
+						} while (++i < labels_count && error != ERR_NONE);
+					}
+				}
+				if (error == ERR_NONE) {
+					error = ERR_INTERRUPTIBLE;
+					s.hpil_processBuffer = hpil_wrtpRefreshBuf;
+					s.cmdType = TypeCreate | TypeWrite;
+					s.fType = 0xe080;
+					s.fTypeMask = 0xffff;
+					s.fAttr = (flags.f.auto_exec) ? 0x02 : 0x00;
+					s.fAttrMask = 0xff;
+					// core_program_size ignore (implicit ?) END...
+					s.fLength = core_program_size(current_prgm) + 3;
+					// take care of the extra crc byte !
+					s.fBlocks = (BLOCK_SZ + s.fLength)  / BLOCK_SZ;
+					// go
+					ILCMD_IDY(1);
+					hpil_step = 0;
+					hpil_completion = hpil_massGenericReadWrite_completion;
+					mode_interruptible = hpil_worker;
+					mode_stoppable = false;
+				}
+			}
 		}
 	}
-	if (err != ERR_NONE) {
-		return err;
-	}
-	s.hpil_processBuffer = hpil_wrtpRefreshBuf;
-	s.cmdType = TypeCreate | TypeWrite;
-	s.fType = 0xe080;
-	s.fTypeMask = 0xffff;
-	s.fAttr = (flags.f.auto_exec) ? 0x02 : 0x00;
-	s.fAttrMask = 0xff;
-	// core_program_size ignore (implicit ?) END...
-	s.fLength = core_program_size(current_prgm) + 3;
-	// take care of the extra crc byte !
-	s.fBlocks = (BLOCK_SZ + s.fLength)  / BLOCK_SZ;
-	// go
-	ILCMD_IDY(1);
-	hpil_step = 0;
-	hpil_completion = hpil_massGenericReadWrite_completion;
-	mode_interruptible = hpil_worker;
-	return ERR_INTERRUPTIBLE;
+	return error;
 }
 
 /* docmd_wrtr
@@ -672,144 +821,174 @@ int docmd_wrtp(arg_struct *arg) {
  *		if file does not exists, create 0xe0d8 type & write
  */
 int docmd_wrtr(arg_struct *arg) {
-	int i, j, err;
-	Regs r;
+	int err;
 	err = hpil_check();
-	if (err != ERR_NONE) {
+	if (err == ERR_OVERLAPED_OPERATION) {
+		mode_interruptible = defrd_wrtr;
+		return ERR_INTERRUPTIBLE;
+	}
+	else if (err != ERR_NONE) {
 		return err;
 	}
-	// check alpha format
-	err = hpil_splitAlphaReg(SPLIT_MODE_VAR);
-	if (err != ERR_NONE) {
-		return err;
-	}
-	if (vars_count == 0) {
-		return ERR_NO_VARIABLES;
-	}
-	// preset ftype & mask, cmd & attributes
-	s.hpil_processBuffer = hpil_wrtrRefreshBuf;
-	s.cmdType = TypeCreate | TypeWrite;
-	strncpy(s.fName, alphaSplit.str1, alphaSplit.len1);
-	s.fType = 0xe0d8;
-	s.fTypeMask = 0xffff;
-	s.fAttr = 0x00;
-	s.fAttrMask = 0xff;
-	s.fLength = 0;
-	// setup against input mode
-	if (alphaSplit.len2 == 0) {
-		// hp-41c wrtr style only, recover 'REGS' matrix
-		s.varIndex = lookup_var("REGS", 4);
-		s.varCount = 1;
-		s.r.reg = recall_var("REGS", 4);
-		if (s.r.reg == NULL) {
-			err = ERR_NONEXISTENT;
-		}
-		else if (s.r.reg->type == TYPE_REALMATRIX) {
-			if ((s.r.rm->rows == 1) || (s.r.rm->columns == 1)) {
-				s.cmdType = TypeWrite | TypePartial;
-				s.fType = 0xe0d0;
-				s.vheader.remaining = 1;
+	return defrd_wrtr(ERR_NONE);
+}
+
+static int defrd_wrtr(int error) {
+	int i, j;
+	Regs r;
+	if (error == ERR_NONE) {
+		// check alpha format
+		error = hpil_splitAlphaReg(SPLIT_MODE_VAR);
+		if (error == ERR_NONE) {
+			if (vars_count == 0) {
+				error = ERR_NO_VARIABLES;
 			}
 			else {
-				err = ERR_DIMENSION_ERROR;
+				// preset ftype & mask, cmd & attributes
+				s.hpil_processBuffer = hpil_wrtrRefreshBuf;
+				s.cmdType = TypeCreate | TypeWrite;
+				strncpy(s.fName, alphaSplit.str1, alphaSplit.len1);
+				s.fType = 0xe0d8;
+				s.fTypeMask = 0xffff;
+				s.fAttr = 0x00;
+				s.fAttrMask = 0xff;
+				s.fLength = 0;
+				// setup against input mode
+				if (alphaSplit.len2 == 0) {
+					// hp-41c wrtr style only, recover 'REGS' matrix
+					s.varIndex = lookup_var("REGS", 4);
+					s.varCount = 1;
+					s.r.reg = recall_var("REGS", 4);
+					if (s.r.reg == NULL) {
+						error = ERR_NONEXISTENT;
+					}
+					else if (s.r.reg->type == TYPE_REALMATRIX) {
+						if ((s.r.rm->rows == 1) || (s.r.rm->columns == 1)) {
+							s.cmdType = TypeWrite | TypePartial;
+							s.fType = 0xe0d0;
+							s.vheader.remaining = 1;
+						}
+						else {
+							error = ERR_DIMENSION_ERROR;
+						}
+					}
+					else {
+						error = ERR_INVALID_TYPE;
+					}
+				}
+				else if (alphaSplit.str2[0] != '*') {
+					// single variable, may enable hp-41c style on unidimensional real matrix
+					s.varIndex = lookup_var(alphaSplit.str2, alphaSplit.len2);
+					s.varCount = 1;
+					r.reg = recall_var(alphaSplit.str2, alphaSplit.len2);
+					if (r.reg == NULL) {
+						error = ERR_NONEXISTENT;
+					}
+					else if (r.reg->type == TYPE_REALMATRIX) {
+						if ((r.rm->rows == 1) || (r.rm->columns == 1)) {
+							s.r.reg = r.reg;
+							s.fTypeMask = 0xfff0;
+						}
+					}
+				}
+				else {
+					// all variables, only free42 format / point to first variable
+					s.varIndex = 0;
+					s.varCount = vars_count;
+					s.fType = 0xe0dc;
+				}
+				if (error == ERR_NONE) {
+					// calculate file size
+					j = s.varIndex;
+					for (i = 0; i < s.varCount; i++) {
+						r.reg = vars[j++].value;
+						switch (r.reg->type) {
+							case TYPE_NULL :
+								break;
+							case TYPE_REAL :
+								s.fLength += NumSize;
+								break;
+							case TYPE_COMPLEX :
+								s.fLength += 2 * NumSize;
+								break;
+							case TYPE_REALMATRIX :
+								// store along value and string flag
+								s.fLength += (NumSize * (r.rm->rows * r.rm->columns)) + (((r.rm->rows * r.rm->columns) + 0x000f) & ~0x000f);
+								break;
+							case TYPE_COMPLEXMATRIX :
+								s.fLength += (2 * NumSize * r.cm->rows * r.cm->columns);
+								break;
+							case TYPE_STRING :
+								s.fLength += NumSize;
+								break;
+							default :
+								error = ERR_INTERNAL_ERROR;
+						}
+						s.fLength += sizeof(il_vheader);
+					}
+				}
+				if (error == ERR_NONE) {
+					error = ERR_INTERRUPTIBLE;
+					s.fLength = (s.fLength + REGS_SZ - 1) / REGS_SZ;
+					s.fBlocks = ((BLOCK_SZ / REGS_SZ) - 1 + s.fLength)  / (BLOCK_SZ / REGS_SZ);
+					// go
+					ILCMD_IDY(1);
+					hpil_step = 0;
+					hpil_completion = hpil_massGenericReadWrite_completion;
+					mode_interruptible = hpil_worker;
+					mode_stoppable = false;
+					error = ERR_INTERRUPTIBLE;
+				}
 			}
 		}
-		else {
-			err = ERR_INVALID_TYPE;
-		}
 	}
-	else if (alphaSplit.str2[0] != '*') {
-		// single variable, may enable hp-41c style on unidimensional real matrix
-		s.varIndex = lookup_var(alphaSplit.str2, alphaSplit.len2);
-		s.varCount = 1;
-		r.reg = recall_var(alphaSplit.str2, alphaSplit.len2);
-		if (r.reg == NULL) {
-			err = ERR_NONEXISTENT;
-		}
-		else if (r.reg->type == TYPE_REALMATRIX) {
-			if ((r.rm->rows == 1) || (r.rm->columns == 1)) {
-				s.r.reg = r.reg;
-				s.fTypeMask = 0xfff0;
-			}
-		}
-	}
-	else {
-		// all variables, only free42 format / point to first variable
-		s.varIndex = 0;
-		s.varCount = vars_count;
-		s.fType = 0xe0dc;
-	}
-	if (err == ERR_NONE) {
-		// calculate file size
-		j = s.varIndex;
-		for (i = 0; i < s.varCount; i++) {
-			r.reg = vars[j++].value;
-			switch (r.reg->type) {
-				case TYPE_NULL :
-					break;
-				case TYPE_REAL :
-					s.fLength += NumSize;
-					break;
-				case TYPE_COMPLEX :
-					s.fLength += 2 * NumSize;
-					break;
-				case TYPE_REALMATRIX :
-					// store along value and string flag
-					s.fLength += (NumSize * (r.rm->rows * r.rm->columns)) + (((r.rm->rows * r.rm->columns) + 0x000f) & ~0x000f);
-					break;
-				case TYPE_COMPLEXMATRIX :
-					s.fLength += (2 * NumSize * r.cm->rows * r.cm->columns);
-					break;
-				case TYPE_STRING :
-					s.fLength += NumSize;
-					break;
-				default :
-					return ERR_INTERNAL_ERROR;
-			}
-			s.fLength += sizeof(il_vheader);
-		}
-		s.fLength = (s.fLength + REGS_SZ - 1) / REGS_SZ;
-		s.fBlocks = ((BLOCK_SZ / REGS_SZ) - 1 + s.fLength)  / (BLOCK_SZ / REGS_SZ);
-		// go
-		ILCMD_IDY(1);
-		hpil_step = 0;
-		hpil_completion = hpil_massGenericReadWrite_completion;
-		mode_interruptible = hpil_worker;
-		err = ERR_INTERRUPTIBLE;
-	}
-	return err;
+	return error;
 }
 
 int docmd_zero(arg_struct *arg) {
-	int i;
 	int err;
 	err = hpil_check();
-	if (err != ERR_NONE) {
+	if (err == ERR_OVERLAPED_OPERATION) {
+		mode_interruptible = defrd_zero;
+		return ERR_INTERRUPTIBLE;
+	}
+	else if (err != ERR_NONE) {
 		return err;
 	}
-	if (reg_alpha_length < 1) {
-		return ERR_ALPHA_DATA_IS_INVALID;
-	}
-	for (i = 0; i < 10; i++) {
-		if (i < reg_alpha_length) {
-			s.fName[i] = reg_alpha[i];
+	return defrd_zero(ERR_NONE);
+}
+
+static int defrd_zero(int error) {
+	int i;
+	if (error == ERR_NONE) {
+		if (reg_alpha_length < 1) {
+			error = ERR_ALPHA_DATA_IS_INVALID;
 		}
 		else {
-			s.fName[i] = ' ';
+			error = ERR_INTERRUPTIBLE;
+			for (i = 0; i < 10; i++) {
+				if (i < reg_alpha_length) {
+					s.fName[i] = reg_alpha[i];
+				}
+				else {
+					s.fName[i] = ' ';
+				}
+			}
+			s.hpil_processBuffer = hpil_createRefreshBuf;
+			s.cmdType = TypeWrite | TypeZero;
+			s.fType = 0xe0d0;
+			s.fTypeMask = 0xffff;
+			s.fAttr = 0x00;
+			s.fAttrMask = 0xff;
+			hpil_settings.disk = hpil_settings.selected;
+			ILCMD_IDY(1);
+			hpil_step = 0;
+			hpil_completion = hpil_massGenericReadWrite_completion;
+			mode_interruptible = hpil_worker;
+			mode_stoppable = false;
 		}
 	}
-	s.hpil_processBuffer = hpil_createRefreshBuf;
-	s.cmdType = TypeWrite | TypeZero;
-	s.fType = 0xe0d0;
-	s.fTypeMask = 0xffff;
-	s.fAttr = 0x00;
-	s.fAttrMask = 0xff;
-	hpil_settings.disk = hpil_settings.selected;
-	ILCMD_IDY(1);
-	hpil_step = 0;
-	hpil_completion = hpil_massGenericReadWrite_completion;
-	mode_interruptible = hpil_worker;
-	return ERR_INTERRUPTIBLE;
+	return error;
 }
 
 /* cooperative commands runtime
@@ -944,7 +1123,7 @@ static int hpil_massGenericReadWrite_completion(int error) {
 								// create mode & no entry found yet, check this
 								if ((uint16_t)_byteswap_ulong(hpil_controllerAltBuf.dir.fBlocks) >= s.fBlocks) {
 									s.firstFreeBlock = (uint16_t)_byteswap_ulong(hpil_controllerAltBuf.dir.fBStart);
-									s.freeFBlocks = _byteswap_ulong(hpil_controllerAltBuf.dir.fBlocks);
+									s.freeFBlocks = (uint16_t)_byteswap_ulong(hpil_controllerAltBuf.dir.fBlocks);
 									hpil_step = 4;
 								}
 								else {
@@ -2158,7 +2337,7 @@ static int hpil_writeBuffer0_sub(int error) {
 				break;
 			case 3 :
 				ILCMD_nop;
-				error = rtn_il_completion();
+				error = rtn_ilCompletion();
 				break;
 			default :
 				error = ERR_NONE;
@@ -2178,7 +2357,7 @@ static int hpil_write_sub(int error) {
 		switch (hpil_step) {
 			case 0 :		// > DDL 02
 				ILCMD_DDL(0x02);
-				error = rtn_il_completion();
+				error = rtn_ilCompletion();
 				break;
 			default :
 				error = ERR_NONE;
@@ -2204,7 +2383,7 @@ static int hpil_setBytePtr_sub(int error) {
 				hpilXCore.bufSize = 1;
 				hpilXCore.bufPtr = 0;
 				ILCMD_tlk;
-				error = rtn_il_completion();
+				error = rtn_ilCompletion();
 				break;
 			default :
 				error = ERR_NONE;
@@ -2239,7 +2418,7 @@ static int hpil_seek_sub(int error) {
 				break;
 			case 3 :
 				ILCMD_nop;
-				error = rtn_il_completion();
+				error = rtn_ilCompletion();
 				break;
 			default :
 				error = ERR_NONE;
@@ -2259,7 +2438,7 @@ static int hpil_partialWrite_sub(int error) {
 		switch (hpil_step) {
 			case 0 :		// > DDL 06
 				ILCMD_DDL(0x06);
-				error = rtn_il_completion();
+				error = rtn_ilCompletion();
 				break;
 			default :
 				error = ERR_NONE;
@@ -2279,7 +2458,7 @@ static int hpil_close_sub(int error) {
 		switch (hpil_step) {
 			case 0 :		// > DDL 08
 				ILCMD_DDL(0x08);
-				error = rtn_il_completion();
+				error = rtn_ilCompletion();
 				break;
 			default :
 				error = ERR_NONE;
@@ -2349,7 +2528,7 @@ static int hpil_writeDirEntry_sub(int error) {
 			case 6 :		// > done
 				hpilXCore.buf = buf;	// restore original buf
 				ILCMD_nop;
-				error = rtn_il_completion();
+				error = rtn_ilCompletion();
 				break;
 			default :
 				error = ERR_NONE;
@@ -2395,7 +2574,7 @@ static int hpil_readBuffer0_sub(int error) {
 				break;
 			case 6 :		// > UNT
 				ILCMD_UNT;
-				error = rtn_il_completion();
+				error = rtn_ilCompletion();
 				break;
 			default :
 				error = ERR_NONE;
@@ -2437,7 +2616,7 @@ static int hpil_readBufferx_sub(int error) {
 				break;
 			case 5 :		// > UNT
 				ILCMD_UNT;
-				error = rtn_il_completion();
+				error = rtn_ilCompletion();
 				break;
 			default :
 				error = ERR_NONE;
@@ -2462,7 +2641,7 @@ static int hpil_read_sub(int error) {
 				break;
 			case 1 :		// > return
 				ILCMD_nop;
-				error = rtn_il_completion();
+				error = rtn_ilCompletion();
 				break;
 			default :
 				error = ERR_NONE;
@@ -2496,7 +2675,7 @@ static int hpil_getAddress_sub(int error) {
 				break;
 			case 3 :
 				ILCMD_lun;
-				error = rtn_il_completion();
+				error = rtn_ilCompletion();
 				break;
 			default :
 				error = ERR_NONE;
@@ -2533,7 +2712,7 @@ static int hpil_getMaxAddress_sub(int error) {
 				break;
 			case 4 :		// > UNT
 				ILCMD_UNT;
-				error = rtn_il_completion();
+				error = rtn_ilCompletion();
 				break;
 			default :
 				error = ERR_NONE;
@@ -2600,7 +2779,7 @@ static int hpil_diskSelect_sub(int error) {
 					if ((hpil_controllerAltBuf.data[0] & 0x10) == 0x10) {
 						hpil_settings.disk = i;
 						ILCMD_nop;
-						error = rtn_il_completion();
+						error = rtn_ilCompletion();
 					}
 					else {
 						error = ERR_NO_DRIVE;
@@ -2689,7 +2868,7 @@ static int hpil_getHeader_sub(int error) {
 				break;
 			case 7 :		// > done
 				ILCMD_nop;
-				error = rtn_il_completion();
+				error = rtn_ilCompletion();
 				break;
 			default :
 				error = ERR_NONE;
@@ -2759,7 +2938,7 @@ static int hpil_wait_sub(int error) {
 				break;
 			case 4 :		// done
 				ILCMD_nop;
-				error = rtn_il_completion();
+				error = rtn_ilCompletion();
 				break;
 			default :
 				error = ERR_NONE;
@@ -2785,7 +2964,7 @@ static int hpil_dirHeader_sub(int error) {
 				}
 				ILCMD_nop;
 				hpil_step++;
-				error = call_ilCompletion(hpil_display_sub);
+				error = call_ilCompletion(hpil_displayAndPause_sub);
 				break;
 			case 1 :		// > print dir header
 				sprintf(hpil_text,"Name     Type Flg Regs");
@@ -2793,11 +2972,11 @@ static int hpil_dirHeader_sub(int error) {
 				//				   1234567890123456789012	
 				ILCMD_nop;
 				hpil_step++;
-				error = call_ilCompletion(hpil_pauseAndDisplay_sub);
+				error = call_ilCompletion(hpil_displayAndPause_sub);
 				break;
 			case 2 :
 				ILCMD_nop;
-				error = rtn_il_completion();
+				error = rtn_ilCompletion();
 				break;
 			default :
 				error = ERR_NONE;
@@ -2857,11 +3036,11 @@ static int hpil_dirEntry_sub(int error) {
 				//				   1234567890123456789012
 				ILCMD_nop;
 				hpil_step ++;
-				error = call_ilCompletion(hpil_pauseAndDisplay_sub);
+				error = call_ilCompletion(hpil_displayAndPause_sub);
 				break;
 			case 1 :
 				ILCMD_nop;
-				error = rtn_il_completion();
+				error = rtn_ilCompletion();
 				break;
 			default :
 				error = ERR_NONE;
@@ -2880,7 +3059,7 @@ static int hpil_dirFooter_sub(int error) {
 				//				   1234567890123456789012
 				ILCMD_nop;
 				hpil_step++;
-				error = call_ilCompletion(hpil_pauseAndDisplay_sub);
+				error = call_ilCompletion(hpil_displayAndPause_sub);
 				break;
 			case 1 :		// > DDT 07
 				sprintf(hpil_text,"Records left     %5u", s.recordsLeft);
@@ -2888,19 +3067,14 @@ static int hpil_dirFooter_sub(int error) {
 				//				   1234567890123456789012
 				ILCMD_nop;
 				hpil_step++;
-				error = call_ilCompletion(hpil_pauseAndDisplay_sub);
+				error = call_ilCompletion(hpil_displayAndPause_sub);
 				break;
 			case 2 :
-				ILCMD_nop;
-				hpil_step++;
-				error = call_ilCompletion(hpil_pause_sub);
-				break;
-			case 3 :
 				flags.f.two_line_message = 0;
 				flags.f.message = 0;
 				redisplay();
 				ILCMD_nop;
-				error = rtn_il_completion();
+				error = rtn_ilCompletion();
 				break;
 			default :
 				error = ERR_NONE;

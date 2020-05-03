@@ -33,6 +33,9 @@
 #include "hpil_plotter.h"
 #include "string.h"
 
+
+#include "shell.h"
+
 extern HPIL_Settings hpil_settings;
 extern HpilXController hpilXCore;
 extern int controllerCommand;
@@ -117,6 +120,41 @@ struct {
 extern AltBuf hpil_controllerAltBuf;
 extern DataBuf hpil_controllerDataBuf;
 
+static int defrd_clipuu(int);
+static int defrd_csize(int);
+static int defrd_csizeo(int);
+static int defrd_draw(int);
+static int defrd_frame(int);
+static int defrd_gclear(int);
+static int defrd_idraw(int);
+static int defrd_imove(int);
+static int defrd_iplot(int);
+static int defrd_label(int);
+static int defrd_ldir(int);
+static int defrd_limit(int);
+static int defrd_locate(int);
+static int defrd_ltype(int);
+static int defrd_ltypeo(int);
+static int defrd_lxaxis(int);
+static int defrd_lyaxis(int);
+static int defrd_move(int);
+static int defrd_pen(int);
+static int defrd_pendn(int);
+static int defrd_penup(int);
+static int defrd_pinit(int);
+static int defrd_plot(int);
+static int defrd_plregx(int);
+static int defrd_rplot(int);
+static int defrd_setgu(int);
+static int defrd_setuu(int);
+static int defrd_ticlen(int);
+static int defrd_unclip(int);
+static int defrd_xaxis(int);
+static int defrd_xaxiso(int);
+static int defrd_yaxis(int);
+static int defrd_yaxiso(int);
+
+
 static int hpil_plotter_cmd_completion(int);
 static int hpil_plotter_label_completion(int);
 static int hpil_plotter_axis_completion(int);
@@ -144,401 +182,556 @@ int hpil_plotter_check() {
 int docmd_clipuu(arg_struct *arg) {
 	int err;
 	err = hpil_plotter_check();
-	if (err != ERR_NONE) {
+	if (err == ERR_OVERLAPED_OPERATION) {
+		mode_interruptible = defrd_clipuu;
+		return ERR_INTERRUPTIBLE;
+	}
+	else if (err != ERR_NONE) {
 		return err;
 	}
-	if ((reg_x->type == TYPE_REAL) && (reg_y->type == TYPE_REAL) && (reg_z->type == TYPE_REAL) && (reg_t->type == TYPE_REAL)) {
-		x1 = Factor2_x_prime + ((vartype_real *)reg_t)->x * Factor1_x_prime;
-		y1 = Factor2_y_prime + ((vartype_real *)reg_y)->x * Factor1_y_prime;
-		x2 = Factor2_x_prime + ((vartype_real *)reg_z)->x * Factor1_x_prime;
-		y2 = Factor2_y_prime + ((vartype_real *)reg_x)->x * Factor1_y_prime;
-		sprintf((char *)hpil_controllerDataBuf.data, "IW %u,%u,%u,%u;",
-			to_int(x1), to_int(y1), to_int(x2), to_int(y2));
-		ILCMD_AAU;
-		hpil_step = 0;
-		hpil_completion = hpil_plotter_cmd_completion;
-		mode_interruptible = hpil_worker;
-		err = ERR_INTERRUPTIBLE;
+	return defrd_clipuu(ERR_NONE);
+}
+
+static int defrd_clipuu(int error) {
+	if (error == ERR_NONE) {
+		error = ERR_INTERRUPTIBLE;
+		if ((reg_x->type == TYPE_REAL) && (reg_y->type == TYPE_REAL) && (reg_z->type == TYPE_REAL) && (reg_t->type == TYPE_REAL)) {
+			x1 = Factor2_x_prime + ((vartype_real *)reg_t)->x * Factor1_x_prime;
+			y1 = Factor2_y_prime + ((vartype_real *)reg_y)->x * Factor1_y_prime;
+			x2 = Factor2_x_prime + ((vartype_real *)reg_z)->x * Factor1_x_prime;
+			y2 = Factor2_y_prime + ((vartype_real *)reg_x)->x * Factor1_y_prime;
+			sprintf((char *)hpil_controllerDataBuf.data, "IW %u,%u,%u,%u;",
+				to_int(x1), to_int(y1), to_int(x2), to_int(y2));
+			ILCMD_AAU;
+			hpil_step = 0;
+			hpil_completion = hpil_plotter_cmd_completion;
+			mode_interruptible = hpil_worker;
+			mode_stoppable = true;
+		}
+		else if ((reg_x->type == TYPE_STRING) || (reg_y->type == TYPE_STRING) || (reg_z->type == TYPE_STRING) || (reg_t->type == TYPE_STRING)) {
+			error = ERR_ALPHA_DATA_IS_INVALID;
+		}
+		else {
+			error = ERR_INVALID_TYPE;
+		}
 	}
-	else if ((reg_x->type == TYPE_STRING) || (reg_y->type == TYPE_STRING) || (reg_z->type == TYPE_STRING) || (reg_t->type == TYPE_STRING)) {
-		return ERR_ALPHA_DATA_IS_INVALID;
-	}
-	else {
-		err = ERR_INVALID_TYPE;
-	}
-	return err;
+	return error;
 }
 
 int docmd_csize(arg_struct *arg) {
-	int err, i;
+	int err;
+	err = hpil_plotter_check();
+	if (err == ERR_OVERLAPED_OPERATION) {
+		mode_interruptible = defrd_csize;
+		return ERR_INTERRUPTIBLE;
+	}
+	else if (err != ERR_NONE) {
+		return err;
+	}
+	return defrd_csize(ERR_NONE);
+}
+
+static int defrd_csize(int error) {
+	int i;
 	char save_decimal_point;
 	phloat x;
 	phloat dx, dy, r, h, w;
-	err = hpil_plotter_check();
-	if (err != ERR_NONE) {
-		return err;
-	}
-	if (reg_x->type == TYPE_REAL) {
-		x = ((vartype_real *) reg_x)->x;
-		// get absolute value
-		if (x < 0) {
-			x = -x;
+	if (error == ERR_NONE) {
+		error = ERR_INTERRUPTIBLE;
+		if (reg_x->type == TYPE_REAL) {
+			x = ((vartype_real *) reg_x)->x;
+			// get absolute value
+			if (x < 0) {
+				x = -x;
+			}
+			// calculate ratio
+			dx = P2_x - P1_x;
+			dy = P2_y - P1_y;
+			if ((dx == 0) || (dy == 0)) {
+				return ERR_PLOTTER_DATA_ERR;
+			}
+			r = dx / dy;
+			if (r < 0) {
+				r = -r;
+			}
+			// calculate h & w :
+			// if ratio >= 1 : h = x * 0.5 & w = h * 0.7 * ratio 
+			// if ratio < 1 : w = x * 0.35 & h = w * ratio / 0.7
+			if (r < 1) {
+				w = x * 0.35;
+				h = w * r / 0.7;
+			}
+			else {
+				h = x * 0.5;
+				w = h * 0.7 / r;
+			}
+			// force decimal point
+			save_decimal_point = flags.f.decimal_point;
+			flags.f.decimal_point = 1;
+			i = sprintf((char *)hpil_controllerDataBuf.data, "SR ");
+			i += phloat2string(w, (char *)&hpil_controllerDataBuf.data[i], 10, 0, 3, 0, 0, 6);
+			hpil_controllerDataBuf.data[i] = 0;
+			i += sprintf((char *)&hpil_controllerDataBuf.data[i], ",");
+			i += phloat2string(h, (char *)&hpil_controllerDataBuf.data[i], 10, 0, 3, 0, 0, 6);
+			flags.f.decimal_point = save_decimal_point;
+			hpil_controllerDataBuf.data[i] = 0;
+			i += sprintf((char *)&hpil_controllerDataBuf.data[i], ";SL 0;");
+			ILCMD_AAU;
+			hpil_step = 0;
+			hpil_completion = hpil_plotter_cmd_completion;
+			mode_interruptible = hpil_worker;
+			mode_stoppable = true;
 		}
-		// calculate ratio
-		dx = P2_x - P1_x;
-		dy = P2_y - P1_y;
-		if ((dx == 0) || (dy == 0)) {
-			return ERR_PLOTTER_DATA_ERR;
-		}
-		r = dx / dy;
-		if (r < 0) {
-			r = -r;
-		}
-		// calculate h & w :
-		// if ratio >= 1 : h = x * 0.5 & w = h * 0.7 * ratio 
-		// if ratio < 1 : w = x * 0.35 & h = w * ratio / 0.7
-		if (r < 1) {
-			w = x * 0.35;
-			h = w * r / 0.7;
+		else if (reg_x->type == TYPE_STRING) {
+			error = ERR_ALPHA_DATA_IS_INVALID;
 		}
 		else {
-			h = x * 0.5;
-			w = h * 0.7 / r;
+			error = ERR_INVALID_TYPE;
 		}
-		// force decimal point
-		save_decimal_point = flags.f.decimal_point;
-		flags.f.decimal_point = 1;
-		i = sprintf((char *)hpil_controllerDataBuf.data, "SR ");
-		i += phloat2string(w, (char *)&hpil_controllerDataBuf.data[i], 10, 0, 3, 0, 0, 6);
-		hpil_controllerDataBuf.data[i] = 0;
-		i += sprintf((char *)&hpil_controllerDataBuf.data[i], ",");
-		i += phloat2string(h, (char *)&hpil_controllerDataBuf.data[i], 10, 0, 3, 0, 0, 6);
-		flags.f.decimal_point = save_decimal_point;
-		hpil_controllerDataBuf.data[i] = 0;
-		i += sprintf((char *)&hpil_controllerDataBuf.data[i], ";SL 0;");
-		ILCMD_AAU;
-		hpil_step = 0;
-		hpil_completion = hpil_plotter_cmd_completion;
-		mode_interruptible = hpil_worker;
-		err = ERR_INTERRUPTIBLE;
 	}
-	else if (reg_x->type == TYPE_STRING) {
-		return ERR_ALPHA_DATA_IS_INVALID;
-	}
-	else {
-		err = ERR_INVALID_TYPE;
-	}
-return err;
+return error;
 }
 
 int docmd_csizeo(arg_struct *arg) {
-	int err, i;
+	int err;
+	err = hpil_plotter_check();
+	if (err == ERR_OVERLAPED_OPERATION) {
+		mode_interruptible = defrd_csizeo;
+		return ERR_INTERRUPTIBLE;
+	}
+	else if (err != ERR_NONE) {
+		return err;
+	}
+	return defrd_csizeo(ERR_NONE);
+}
+
+static int defrd_csizeo(int error) {
+	int i;
 	char save_decimal_point;
 	phloat x, y, z;
 	phloat dx, dy, r, h, w, s;
-	err = hpil_plotter_check();
-	if (err != ERR_NONE) {
-		return err;
-	}
-	if ((reg_x->type == TYPE_REAL) && (reg_y->type == TYPE_REAL) && (reg_z->type == TYPE_REAL)) {
-		x = ((vartype_real *) reg_x)->x;
-		y = ((vartype_real *) reg_y)->x;
-		z = ((vartype_real *) reg_z)->x;
-		// get absolute values
-		if (x < 0) {
-			x = -x;
+	if (error == ERR_NONE) {
+		if ((reg_x->type == TYPE_REAL) && (reg_y->type == TYPE_REAL) && (reg_z->type == TYPE_REAL)) {
+			x = ((vartype_real *) reg_x)->x;
+			y = ((vartype_real *) reg_y)->x;
+			z = ((vartype_real *) reg_z)->x;
+			// get absolute values
+			if (x < 0) {
+				x = -x;
+			}
+			if (y < 0) {
+				y = -y;
+			}
+			error = mappable_tan_r(z, &s);
+			if (error != ERR_NONE) {
+				return error;
+			}
+			error = ERR_INTERRUPTIBLE;
+			// calculate ratio
+			dx = P2_x - P1_x;
+			dy = P2_y - P1_y;
+			if ((dx == 0) || (dy == 0)) {
+				return ERR_PLOTTER_DATA_ERR;
+			}
+			r = dx / dy;
+			if (r < 0) {
+				r = -r;
+			}
+			// calculate h & w :
+			// if ratio >= 1 : h = x * 0.5 & w = h * 0.7 * ratio 
+			// if ratio < 1 : w = x * 0.35 & h = w * ratio / 0.7
+			if (r < 1) {
+				w = x * 0.35;
+				h = w * r / 0.7;
+			}
+			else {
+				h = x * 0.5;
+				w = h * 0.7 / r;
+			}
+			// force decimal point
+			save_decimal_point = flags.f.decimal_point;
+			flags.f.decimal_point = 1;
+			i = sprintf((char *)hpil_controllerDataBuf.data, "SR ");
+			i += phloat2string(w, (char *)&hpil_controllerDataBuf.data[i], 10, 0, 3, 0, 0, 6);
+			hpil_controllerDataBuf.data[i] = 0;
+			i += sprintf((char *)&hpil_controllerDataBuf.data[i], ",");
+			i += phloat2string(h, (char *)&hpil_controllerDataBuf.data[i], 10, 0, 3, 0, 0, 6);
+			hpil_controllerDataBuf.data[i] = 0;
+			i += sprintf((char *)&hpil_controllerDataBuf.data[i], ";SL ");
+			i += phloat2string(s, (char *)&hpil_controllerDataBuf.data[i], 10, 0, 3, 0, 0, 6);
+			i += sprintf((char *)&hpil_controllerDataBuf.data[i], ";");
+			flags.f.decimal_point = save_decimal_point;
+			ILCMD_AAU;
+			hpil_step = 0;
+			hpil_completion = hpil_plotter_cmd_completion;
+			mode_interruptible = hpil_worker;
+			mode_stoppable = true;
 		}
-		if (y < 0) {
-			y = -y;
-		}
-		err = mappable_tan_r(z, &s);
-		if (err != ERR_NONE) {
-			return err;
-		}
-		// calculate ratio
-		dx = P2_x - P1_x;
-		dy = P2_y - P1_y;
-		if ((dx == 0) || (dy == 0)) {
-			return ERR_PLOTTER_DATA_ERR;
-		}
-		r = dx / dy;
-		if (r < 0) {
-			r = -r;
-		}
-		// calculate h & w :
-		// if ratio >= 1 : h = x * 0.5 & w = h * 0.7 * ratio 
-		// if ratio < 1 : w = x * 0.35 & h = w * ratio / 0.7
-		if (r < 1) {
-			w = x * 0.35;
-			h = w * r / 0.7;
+		else if ((reg_x->type == TYPE_STRING) || (reg_y->type == TYPE_STRING) || (reg_z->type == TYPE_STRING)) {
+			error = ERR_ALPHA_DATA_IS_INVALID;
 		}
 		else {
-			h = x * 0.5;
-			w = h * 0.7 / r;
+			error = ERR_INVALID_TYPE;
 		}
-		// force decimal point
-		save_decimal_point = flags.f.decimal_point;
-		flags.f.decimal_point = 1;
-		i = sprintf((char *)hpil_controllerDataBuf.data, "SR ");
-		i += phloat2string(w, (char *)&hpil_controllerDataBuf.data[i], 10, 0, 3, 0, 0, 6);
-		hpil_controllerDataBuf.data[i] = 0;
-		i += sprintf((char *)&hpil_controllerDataBuf.data[i], ",");
-		i += phloat2string(h, (char *)&hpil_controllerDataBuf.data[i], 10, 0, 3, 0, 0, 6);
-		hpil_controllerDataBuf.data[i] = 0;
-		i += sprintf((char *)&hpil_controllerDataBuf.data[i], ";SL ");
-		i += phloat2string(s, (char *)&hpil_controllerDataBuf.data[i], 10, 0, 3, 0, 0, 6);
-		i += sprintf((char *)&hpil_controllerDataBuf.data[i], ";");
-		flags.f.decimal_point = save_decimal_point;
-		ILCMD_AAU;
-		hpil_step = 0;
-		hpil_completion = hpil_plotter_cmd_completion;
-		mode_interruptible = hpil_worker;
-		err = ERR_INTERRUPTIBLE;
 	}
-	else if ((reg_x->type == TYPE_STRING) || (reg_y->type == TYPE_STRING) || (reg_z->type == TYPE_STRING)) {
-		return ERR_ALPHA_DATA_IS_INVALID;
-	}
-	else {
-		err = ERR_INVALID_TYPE;
-	}
-return err;
+return error;
 }
 
 int docmd_draw(arg_struct *arg) {
 	int err;
-	err = hpil_plotter_check();
-	if (err != ERR_NONE) {
+	err = hpil_plotter_check();;
+	if (err == ERR_OVERLAPED_OPERATION) {
+		mode_interruptible = defrd_draw;
+		return ERR_INTERRUPTIBLE;
+	}
+	else if (err != ERR_NONE) {
 		return err;
 	}
-	if ((reg_x->type == TYPE_REAL) && (reg_y->type == TYPE_REAL)) {
-		plotterData.ioBuf.plotting_status = (plotterData.ioBuf.plotting_status & 0x000f) | (PLOTTER_FLAG_SET_PEN_STATUS | PLOTTER_FLAG_SET_PEN_DOWN);
-		ILCMD_AAU;
-		hpil_step = 0;
-		hpil_completion = hpil_plotter_plot_generic_completion;
-		mode_interruptible = hpil_worker;
-		err = ERR_INTERRUPTIBLE;
+	return defrd_draw(ERR_NONE);
+}
+
+static int defrd_draw(int error) {
+	if (error == ERR_NONE) {
+		error = ERR_INTERRUPTIBLE;
+		if ((reg_x->type == TYPE_REAL) && (reg_y->type == TYPE_REAL)) {
+			plotterData.ioBuf.plotting_status = (plotterData.ioBuf.plotting_status & 0x000f) | (PLOTTER_FLAG_SET_PEN_STATUS | PLOTTER_FLAG_SET_PEN_DOWN);
+			ILCMD_AAU;
+			hpil_step = 0;
+			hpil_completion = hpil_plotter_plot_generic_completion;
+			mode_interruptible = hpil_worker;
+			mode_stoppable = true;
+		}
+		else if ((reg_x->type == TYPE_STRING) || (reg_y->type == TYPE_STRING)) {
+			error = ERR_ALPHA_DATA_IS_INVALID;
+		}
+		else {
+			error = ERR_INVALID_TYPE;
+		}
 	}
-	else if ((reg_x->type == TYPE_STRING) || (reg_y->type == TYPE_STRING)) {
-		return ERR_ALPHA_DATA_IS_INVALID;
-	}
-	else {
-		err = ERR_INVALID_TYPE;
-	}
-	return err;
+	return error;
 }
 
 int docmd_frame(arg_struct *arg) {
 	int err;
-	err = hpil_plotter_check();
-	if (err != ERR_NONE) {
+	err = hpil_plotter_check();;
+	if (err == ERR_OVERLAPED_OPERATION) {
+		mode_interruptible = defrd_frame;
+		return ERR_INTERRUPTIBLE;
+	}
+	else if (err != ERR_NONE) {
 		return err;
 	}
-	if (plotterData.ioBuf.plotting_status && PLOTTER_STATUS_MODE_UU) {
-		sprintf((char *)hpil_controllerDataBuf.data, "PU;PA %u,%u;PD; PA %u,%u,%u,%u,%u,%u,%u,%u;PU;",
-					to_int(x1), to_int(y1),
-					to_int(x1), to_int(y2), to_int(x2), to_int(y2), to_int(x2), to_int(y1), to_int(x1), to_int(y1));
+	return defrd_frame(ERR_NONE);
+}
+
+static int defrd_frame(int error) {
+	if (error == ERR_NONE) {
+		error = ERR_INTERRUPTIBLE;
+		if (plotterData.ioBuf.plotting_status && PLOTTER_STATUS_MODE_UU) {
+			sprintf((char *)hpil_controllerDataBuf.data, "PU;PA %u,%u;PD; PA %u,%u,%u,%u,%u,%u,%u,%u;PU;",
+				to_int(x1), to_int(y1),
+				to_int(x1), to_int(y2), to_int(x2), to_int(y2), to_int(x2), to_int(y1), to_int(x1), to_int(y1));
+		}
+		else {
+			sprintf((char *)hpil_controllerDataBuf.data, "PU;PA %u,%u;PD; PA %u,%u,%u,%u,%u,%u,%u,%u;PU;",
+				to_int(P1_x), to_int(P1_x),
+				to_int(P1_x), to_int(P2_y), to_int(P2_x), to_int(P2_y), to_int(P2_x), to_int(P1_y), to_int(P1_x), to_int(P1_y));
+		}
+		ILCMD_AAU;
+		hpil_step = 0;
+		hpil_completion = hpil_plotter_cmd_completion;
+		mode_interruptible = hpil_worker;
+		mode_stoppable = true;
 	}
-	else {
-		sprintf((char *)hpil_controllerDataBuf.data, "PU;PA %u,%u;PD; PA %u,%u,%u,%u,%u,%u,%u,%u;PU;",
-					to_int(P1_x), to_int(P1_x),
-					to_int(P1_x), to_int(P2_y), to_int(P2_x), to_int(P2_y), to_int(P2_x), to_int(P1_y), to_int(P1_x), to_int(P1_y));
-	}
-	ILCMD_AAU;
-	hpil_step = 0;
-	hpil_completion = hpil_plotter_cmd_completion;
-	mode_interruptible = hpil_worker;
-	return ERR_INTERRUPTIBLE;
+	return error;
 }
 
 int docmd_gclear(arg_struct *arg) {
 	int err;
-	err = hpil_plotter_check();
-	if (err != ERR_NONE) {
+	err = hpil_plotter_check();;
+	if (err == ERR_OVERLAPED_OPERATION) {
+		mode_interruptible = defrd_gclear;
+		return ERR_INTERRUPTIBLE;
+	}
+	else if (err != ERR_NONE) {
 		return err;
 	}
-	sprintf((char *)hpil_controllerDataBuf.data, "AF;");
-	ILCMD_AAU;
-	hpil_step = 0;
-	hpil_completion = hpil_plotter_cmd_completion;
-	mode_interruptible = hpil_worker;
-	return ERR_INTERRUPTIBLE;
+	return defrd_gclear(ERR_NONE);
+}
+
+static int defrd_gclear(int error) {
+	if (error == ERR_NONE) {
+		error = ERR_INTERRUPTIBLE;
+		sprintf((char *)hpil_controllerDataBuf.data, "AF;");
+		ILCMD_AAU;
+		hpil_step = 0;
+		hpil_completion = hpil_plotter_cmd_completion;
+		mode_interruptible = hpil_worker;
+		mode_stoppable = true;
+	}
+	return error;
 }
 
 int docmd_idraw(arg_struct *arg) {
 	int err;
-	err = hpil_plotter_check();
-	if (err != ERR_NONE) {
+	err = hpil_plotter_check();;
+	if (err == ERR_OVERLAPED_OPERATION) {
+		mode_interruptible = defrd_idraw;
+		return ERR_INTERRUPTIBLE;
+	}
+	else if (err != ERR_NONE) {
 		return err;
 	}
-	if ((reg_x->type == TYPE_REAL) && (reg_y->type == TYPE_REAL)) {
-		plotterData.ioBuf.plotting_status = (plotterData.ioBuf.plotting_status & 0x000f) | (PLOTTER_FLAG_SET_PEN_STATUS | PLOTTER_FLAG_SET_PEN_DOWN | PLOTTER_FLAG_INCREMENT);
-		ILCMD_AAU;
-		hpil_step = 0;
-		hpil_completion = hpil_plotter_plot_generic_completion;
-		mode_interruptible = hpil_worker;
-		err = ERR_INTERRUPTIBLE;
+	return defrd_idraw(ERR_NONE);
+}
+
+static int defrd_idraw(int error) {
+	if (error == ERR_NONE) {
+		error = ERR_INTERRUPTIBLE;
+		if ((reg_x->type == TYPE_REAL) && (reg_y->type == TYPE_REAL)) {
+			plotterData.ioBuf.plotting_status = (plotterData.ioBuf.plotting_status & 0x000f) | (PLOTTER_FLAG_SET_PEN_STATUS | PLOTTER_FLAG_SET_PEN_DOWN | PLOTTER_FLAG_INCREMENT);
+			ILCMD_AAU;
+			hpil_step = 0;
+			hpil_completion = hpil_plotter_plot_generic_completion;
+			mode_interruptible = hpil_worker;
+			mode_stoppable = true;
+			}
+		else if ((reg_x->type == TYPE_STRING) || (reg_y->type == TYPE_STRING)) {
+			error = ERR_ALPHA_DATA_IS_INVALID;
+		}
+		else {
+			error = ERR_INVALID_TYPE;
+		}
 	}
-	else if ((reg_x->type == TYPE_STRING) || (reg_y->type == TYPE_STRING)) {
-		return ERR_ALPHA_DATA_IS_INVALID;
-	}
-	else {
-		err = ERR_INVALID_TYPE;
-	}
-	return err;
+	return error;
 }
 
 int docmd_imove(arg_struct *arg) {
 	int err;
-	err = hpil_plotter_check();
-	if (err != ERR_NONE) {
+	err = hpil_plotter_check();;
+	if (err == ERR_OVERLAPED_OPERATION) {
+		mode_interruptible = defrd_imove;
+		return ERR_INTERRUPTIBLE;
+	}
+	else if (err != ERR_NONE) {
 		return err;
 	}
-	if ((reg_x->type == TYPE_REAL) && (reg_y->type == TYPE_REAL)) {
-		plotterData.ioBuf.plotting_status = (plotterData.ioBuf.plotting_status & 0x000f) | (PLOTTER_FLAG_SET_PEN_STATUS | PLOTTER_FLAG_INCREMENT);
-		ILCMD_AAU;
-		hpil_step = 0;
-		hpil_completion = hpil_plotter_plot_generic_completion;
-		mode_interruptible = hpil_worker;
-		err = ERR_INTERRUPTIBLE;
+	return defrd_imove(ERR_NONE);
+}
+
+static int defrd_imove(int error) {
+	if (error == ERR_NONE) {
+		error = ERR_INTERRUPTIBLE;
+		if ((reg_x->type == TYPE_REAL) && (reg_y->type == TYPE_REAL)) {
+			plotterData.ioBuf.plotting_status = (plotterData.ioBuf.plotting_status & 0x000f) | (PLOTTER_FLAG_SET_PEN_STATUS | PLOTTER_FLAG_INCREMENT);
+			ILCMD_AAU;
+			hpil_step = 0;
+			hpil_completion = hpil_plotter_plot_generic_completion;
+			mode_interruptible = hpil_worker;
+			mode_stoppable = true;
+		}
+		else if ((reg_x->type == TYPE_STRING) || (reg_y->type == TYPE_STRING)) {
+			error = ERR_ALPHA_DATA_IS_INVALID;
+		}
+		else {
+			error = ERR_INVALID_TYPE;
+		}
 	}
-	else if ((reg_x->type == TYPE_STRING) || (reg_y->type == TYPE_STRING)) {
-		return ERR_ALPHA_DATA_IS_INVALID;
-	}
-	else {
-		err = ERR_INVALID_TYPE;
-	}
-	return err;
+	return error;
 }
 
 int docmd_iplot(arg_struct *arg) {
 	int err;
-	err = hpil_plotter_check();
-	if (err != ERR_NONE) {
+	err = hpil_plotter_check();;
+	if (err == ERR_OVERLAPED_OPERATION) {
+		mode_interruptible = defrd_iplot;
+		return ERR_INTERRUPTIBLE;
+	}
+	else if (err != ERR_NONE) {
 		return err;
 	}
-	if ((reg_x->type == TYPE_REAL) && (reg_y->type == TYPE_REAL)) {
-		plotterData.ioBuf.plotting_status = (plotterData.ioBuf.plotting_status & 0x000f) | (PLOTTER_FLAG_SET_PEN_DOWN | PLOTTER_FLAG_INCREMENT);
-		ILCMD_AAU;
-		hpil_step = 0;
-		hpil_completion = hpil_plotter_plot_generic_completion;
-		mode_interruptible = hpil_worker;
-		err = ERR_INTERRUPTIBLE;
+	return defrd_iplot(ERR_NONE);
+}
+
+static int defrd_iplot(int error) {
+	if (error == ERR_NONE) {
+		error = ERR_INTERRUPTIBLE;
+		if ((reg_x->type == TYPE_REAL) && (reg_y->type == TYPE_REAL)) {
+			plotterData.ioBuf.plotting_status = (plotterData.ioBuf.plotting_status & 0x000f) | (PLOTTER_FLAG_SET_PEN_DOWN | PLOTTER_FLAG_INCREMENT);
+			ILCMD_AAU;
+			hpil_step = 0;
+			hpil_completion = hpil_plotter_plot_generic_completion;
+			mode_interruptible = hpil_worker;
+			mode_stoppable = true;
+		}
+		else if ((reg_x->type == TYPE_STRING) || (reg_y->type == TYPE_STRING)) {
+			error = ERR_ALPHA_DATA_IS_INVALID;
+		}
+		else {
+			error = ERR_INVALID_TYPE;
+		}
 	}
-	else if ((reg_x->type == TYPE_STRING) || (reg_y->type == TYPE_STRING)) {
-		return ERR_ALPHA_DATA_IS_INVALID;
-	}
-	else {
-		err = ERR_INVALID_TYPE;
-	}
-	return err;
+	return error;
 }
 
 int docmd_label(arg_struct *arg) {
 	int err;
-	phloat x, res;
-	err = hpil_plotter_check();
-	if (err != ERR_NONE) {
+	err = hpil_plotter_check();;
+	if (err == ERR_OVERLAPED_OPERATION) {
+		mode_interruptible = defrd_label;
+		return ERR_INTERRUPTIBLE;
+	}
+	else if (err != ERR_NONE) {
 		return err;
 	}
-	ILCMD_AAU;
-	hpil_step = 0;
-	hpil_completion = hpil_plotter_label_completion;
-	mode_interruptible = hpil_worker;
-	return ERR_INTERRUPTIBLE;
+	return defrd_label(ERR_NONE);
+}
+
+static int defrd_label(int error) {
+	if (error == ERR_NONE) {
+		error = ERR_INTERRUPTIBLE;
+		ILCMD_AAU;
+		hpil_step = 0;
+		hpil_completion = hpil_plotter_label_completion;
+		mode_interruptible = hpil_worker;
+		mode_stoppable = true;
+	}
+	return error;
 }
 
 int docmd_ldir(arg_struct *arg) {
-	int err, i;
+	int err;
+	err = hpil_plotter_check();;
+	if (err == ERR_OVERLAPED_OPERATION) {
+		mode_interruptible = defrd_ldir;
+		return ERR_INTERRUPTIBLE;
+	}
+	else if (err != ERR_NONE) {
+		return err;
+	}
+	return defrd_ldir(ERR_NONE);
+}
+
+static int defrd_ldir(int error) {
+	int i;
 	char save_decimal_point;
 	phloat x, run, rise;
-    if (reg_x->type == TYPE_REAL) {
-		x = ((vartype_real *)reg_x)->x;
-		mappable_cos_r(x, &run);
-		mappable_sin_r(x, &rise);
-		i = sprintf((char *)hpil_controllerDataBuf.data, "DI ");
-		save_decimal_point = flags.f.decimal_point;
-		flags.f.decimal_point = 1;
-		i += phloat2string(run, (char *)&hpil_controllerDataBuf.data[i], 10, 0, 3, 0, 0, 6);
-		i += sprintf((char *)&hpil_controllerDataBuf.data[i], ",");
-		i += phloat2string(rise, (char *)&hpil_controllerDataBuf.data[i], 10, 0, 3, 0, 0, 6);
-		flags.f.decimal_point = save_decimal_point;
-		i += sprintf((char *)&hpil_controllerDataBuf.data[i], ";");
-		ILCMD_AAU;
-		hpil_step = 0;
-		hpil_completion = hpil_plotter_cmd_completion;
-		mode_interruptible = hpil_worker;
-		err = ERR_INTERRUPTIBLE;
-    }
-	else if (reg_x->type == TYPE_STRING) {
-        return ERR_ALPHA_DATA_IS_INVALID;
+	if (error == ERR_NONE) {
+		error = ERR_INTERRUPTIBLE;
+	    if (reg_x->type == TYPE_REAL) {
+			x = ((vartype_real *)reg_x)->x;
+			mappable_cos_r(x, &run);
+			mappable_sin_r(x, &rise);
+			i = sprintf((char *)hpil_controllerDataBuf.data, "DI ");
+			save_decimal_point = flags.f.decimal_point;
+			flags.f.decimal_point = 1;
+			i += phloat2string(run, (char *)&hpil_controllerDataBuf.data[i], 10, 0, 3, 0, 0, 6);
+			i += sprintf((char *)&hpil_controllerDataBuf.data[i], ",");
+			i += phloat2string(rise, (char *)&hpil_controllerDataBuf.data[i], 10, 0, 3, 0, 0, 6);
+			flags.f.decimal_point = save_decimal_point;
+			i += sprintf((char *)&hpil_controllerDataBuf.data[i], ";");
+			ILCMD_AAU;
+			hpil_step = 0;
+			hpil_completion = hpil_plotter_cmd_completion;
+			mode_interruptible = hpil_worker;
+			mode_stoppable = true;
+	    }
+		else if (reg_x->type == TYPE_STRING) {
+	        error = ERR_ALPHA_DATA_IS_INVALID;
+		}
+		else {
+			error = ERR_INVALID_TYPE;
+		}
 	}
-	else {
-		return ERR_INVALID_TYPE;
-	}
-	return err;
+	return error;
 }
 
 int docmd_limit(arg_struct *arg) {
 	int err;
-	err = hpil_plotter_check();
-	if (err != ERR_NONE) {
+	err = hpil_plotter_check();;
+	if (err == ERR_OVERLAPED_OPERATION) {
+		mode_interruptible = defrd_limit;
+		return ERR_INTERRUPTIBLE;
+	}
+	else if (err != ERR_NONE) {
 		return err;
 	}
-	if ((reg_x->type == TYPE_REAL) && (reg_y->type == TYPE_REAL) && (reg_z->type == TYPE_REAL) && (reg_t->type == TYPE_REAL)) {
-		x1 = ((vartype_real *)reg_t)->x * 40;
-		y1 = ((vartype_real *)reg_y)->x * 40;
-		x2 = ((vartype_real *)reg_z)->x * 40;
-		y2 = ((vartype_real *)reg_x)->x * 40;
-		sprintf((char *)hpil_controllerDataBuf.data, "IP %u,%u,%u,%u;",
-			to_int(x1), to_int(y1), to_int(x2), to_int(y2));
-		ILCMD_AAU;
-		hpil_step = 0;
-		hpil_completion = hpil_plotter_limit_pinit_completion;
-		mode_interruptible = hpil_worker;
-		err = ERR_INTERRUPTIBLE;
+	return defrd_limit(ERR_NONE);
+}
+
+static int defrd_limit(int error) {
+	if (error == ERR_NONE) {
+		error = ERR_INTERRUPTIBLE;
+		if ((reg_x->type == TYPE_REAL) && (reg_y->type == TYPE_REAL) && (reg_z->type == TYPE_REAL) && (reg_t->type == TYPE_REAL)) {
+			x1 = ((vartype_real *)reg_t)->x * 40;
+			y1 = ((vartype_real *)reg_y)->x * 40;
+			x2 = ((vartype_real *)reg_z)->x * 40;
+			y2 = ((vartype_real *)reg_x)->x * 40;
+			sprintf((char *)hpil_controllerDataBuf.data, "IP %u,%u,%u,%u;",
+				to_int(x1), to_int(y1), to_int(x2), to_int(y2));
+			ILCMD_AAU;
+			hpil_step = 0;
+			hpil_completion = hpil_plotter_limit_pinit_completion;
+			mode_interruptible = hpil_worker;
+			mode_stoppable = true;
+		}
+		else if ((reg_x->type == TYPE_STRING) || (reg_y->type == TYPE_STRING) || (reg_z->type == TYPE_STRING) || (reg_t->type == TYPE_STRING)) {
+			error = ERR_ALPHA_DATA_IS_INVALID;
+		}
+		else {
+			error = ERR_INVALID_TYPE;
+		}
 	}
-	else if ((reg_x->type == TYPE_STRING) || (reg_y->type == TYPE_STRING) || (reg_z->type == TYPE_STRING) || (reg_t->type == TYPE_STRING)) {
-		err = ERR_ALPHA_DATA_IS_INVALID;
-	}
-	else {
-		err = ERR_INVALID_TYPE;
-	}
-	return err;
+	return error;
 }
 
 int docmd_locate(arg_struct *arg) {
 	int err;
-	err = hpil_plotter_check();
-	if (err != ERR_NONE) {
+	err = hpil_plotter_check();;
+	if (err == ERR_OVERLAPED_OPERATION) {
+		mode_interruptible = defrd_locate;
+		return ERR_INTERRUPTIBLE;
+	}
+	else if (err != ERR_NONE) {
 		return err;
 	}
-	if ((reg_x->type == TYPE_REAL) && (reg_y->type == TYPE_REAL) && (reg_z->type == TYPE_REAL) && (reg_t->type == TYPE_REAL)) {
-		x1 = Factor2_x + ((vartype_real *)reg_t)->x * Factor1_x;
-		y1 = Factor2_y + ((vartype_real *)reg_y)->x * Factor1_y;
-		x2 = Factor2_x + ((vartype_real *)reg_z)->x * Factor1_x;
-		y2 = Factor2_y + ((vartype_real *)reg_x)->x * Factor1_y;
-		sprintf((char *)hpil_controllerDataBuf.data, "IW %u,%u,%u,%u;",
-			to_int(x1), to_int(y1), to_int(x2), to_int(y2));
-		ILCMD_AAU;
-		hpil_step = 0;
-		hpil_completion = hpil_plotter_cmd_completion;
-		mode_interruptible = hpil_worker;
-		err = ERR_INTERRUPTIBLE;
+	return defrd_locate(ERR_NONE);
+}
+
+static int defrd_locate(int error) {
+	if (error == ERR_NONE) {
+		error = ERR_INTERRUPTIBLE;
+		if ((reg_x->type == TYPE_REAL) && (reg_y->type == TYPE_REAL) && (reg_z->type == TYPE_REAL) && (reg_t->type == TYPE_REAL)) {
+			x1 = Factor2_x + ((vartype_real *)reg_t)->x * Factor1_x;
+			y1 = Factor2_y + ((vartype_real *)reg_y)->x * Factor1_y;
+			x2 = Factor2_x + ((vartype_real *)reg_z)->x * Factor1_x;
+			y2 = Factor2_y + ((vartype_real *)reg_x)->x * Factor1_y;
+			sprintf((char *)hpil_controllerDataBuf.data, "IW %u,%u,%u,%u;",
+				to_int(x1), to_int(y1), to_int(x2), to_int(y2));
+			ILCMD_AAU;
+			hpil_step = 0;
+			hpil_completion = hpil_plotter_cmd_completion;
+			mode_interruptible = hpil_worker;
+			mode_stoppable = true;
+		}
+		else if ((reg_x->type == TYPE_STRING) || (reg_y->type == TYPE_STRING) || (reg_z->type == TYPE_STRING) || (reg_t->type == TYPE_STRING)) {
+			error = ERR_ALPHA_DATA_IS_INVALID;
+		}
+		else {
+			error = ERR_INVALID_TYPE;
+		}
 	}
-	else if ((reg_x->type == TYPE_STRING) || (reg_y->type == TYPE_STRING) || (reg_z->type == TYPE_STRING) || (reg_t->type == TYPE_STRING)) {
-		return ERR_ALPHA_DATA_IS_INVALID;
-	}
-	else {
-		err = ERR_INVALID_TYPE;
-	}
-	return err;
+	return error;
 }
 
 int docmd_lorg(arg_struct *arg) {
 	int err;
 	phloat x, res;
-	err = hpil_plotter_check();
-	if (err != ERR_NONE) {
+	err = hpil_plotter_check();;
+	if (err == ERR_OVERLAPED_OPERATION) {
+		err = ERR_NONE;
+	}
+	else if (err != ERR_NONE) {
 		return err;
 	}
 	if (reg_x->type == TYPE_REAL) {
@@ -550,9 +743,8 @@ int docmd_lorg(arg_struct *arg) {
 		res = fmod(x, 10);
 		if (res == 0) {
 			res = 1;
-        }
+		}
 		plotterData.ioBuf.lorg = to_int(res);
-		err = ERR_NONE;
 	}
 	else if (reg_x->type == TYPE_STRING) {
 		err = ERR_ALPHA_DATA_IS_INVALID;
@@ -565,320 +757,448 @@ int docmd_lorg(arg_struct *arg) {
 
 int docmd_ltype(arg_struct *arg) {
 	int err;
-	phloat x;
 	err = hpil_plotter_check();
-	if (err != ERR_NONE) {
+	if (err == ERR_OVERLAPED_OPERATION) {
+		mode_interruptible = defrd_ltype;
+		return ERR_INTERRUPTIBLE;
+	}
+	else if (err != ERR_NONE) {
 		return err;
 	}
-	if (reg_x->type == TYPE_REAL) {
-		x = ((vartype_real *) reg_x)->x;
-		x = floor(x);
-		if (x < 2) {
-			sprintf((char *)hpil_controllerDataBuf.data, "LT;");
+	return defrd_ltype(ERR_NONE);
+}
+
+static int defrd_ltype(int error) {
+	phloat x;
+	if (error == ERR_NONE) {
+		error = ERR_INTERRUPTIBLE;
+		if (reg_x->type == TYPE_REAL) {
+			x = ((vartype_real *) reg_x)->x;
+			x = floor(x);
+			if (x < 2) {
+				sprintf((char *)hpil_controllerDataBuf.data, "LT;");
+			}
+			else if (x < 9) {
+				x = x - 2;
+				sprintf((char *)hpil_controllerDataBuf.data, "LT %u;", to_int(x));
+			}
+			else {
+				return ERR_NONE;
+			}
+			ILCMD_AAU;
+			hpil_step = 0;
+			hpil_completion = hpil_plotter_cmd_completion;
+			mode_interruptible = hpil_worker;
+			mode_stoppable = true;
 		}
-		else if (x < 9) {
-			x = x - 2;
-			sprintf((char *)hpil_controllerDataBuf.data, "LT %u;", to_int(x));
+		else if (reg_x->type == TYPE_STRING) {
+			error = ERR_ALPHA_DATA_IS_INVALID;
 		}
 		else {
-			return ERR_NONE;
+			error = ERR_INVALID_TYPE;
 		}
-		ILCMD_AAU;
-		hpil_step = 0;
-		hpil_completion = hpil_plotter_cmd_completion;
-		mode_interruptible = hpil_worker;
-		err = ERR_INTERRUPTIBLE;
 	}
-	else if (reg_x->type == TYPE_STRING) {
-		err = ERR_ALPHA_DATA_IS_INVALID;
-	}
-	else {
-		err = ERR_INVALID_TYPE;
-	}
-	return err;
+	return error;
 }
 
 int docmd_ltypeo(arg_struct *arg) {
 	int err;
-	phloat x,y;
 	err = hpil_plotter_check();
-	if (err != ERR_NONE) {
+	if (err == ERR_OVERLAPED_OPERATION) {
+		mode_interruptible = defrd_ltypeo;
+		return ERR_INTERRUPTIBLE;
+	}
+	else if (err != ERR_NONE) {
 		return err;
 	}
-	if ((reg_x->type == TYPE_REAL) && (reg_y->type == TYPE_REAL)) {
-		x = ((vartype_real *) reg_x)->x;
-		y = ((vartype_real *) reg_y)->x;
-		x = floor(x);
-		y = floor(y);
-		if ((y < 0) || (y > 127)) {
-			return ERR_NONE;
+	return defrd_ltypeo(ERR_NONE);
+}
+
+static int defrd_ltypeo(int error) {
+	phloat x, y;
+	if (error == ERR_NONE) {
+		error = ERR_INTERRUPTIBLE;
+		if ((reg_x->type == TYPE_REAL) && (reg_y->type == TYPE_REAL)) {
+			x = ((vartype_real *) reg_x)->x;
+			y = ((vartype_real *) reg_y)->x;
+			x = floor(x);
+			y = floor(y);
+			if ((y < 0) || (y > 127)) {
+				return ERR_NONE;
+			}
+			if (x < 2) {
+				sprintf((char *)hpil_controllerDataBuf.data, "LT;");
+			}
+			else if (x < 9) {
+				x = x - 2;
+				sprintf((char *)hpil_controllerDataBuf.data, "LT %u,%u;", to_int(x), to_int(y));
+			}
+			else {
+				return ERR_NONE;
+			}
+			ILCMD_AAU;
+			hpil_step = 0;
+			hpil_completion = hpil_plotter_cmd_completion;
+			mode_interruptible = hpil_worker;
+			mode_stoppable = true;
 		}
-		if (x < 2) {
-			sprintf((char *)hpil_controllerDataBuf.data, "LT;");
-		}
-		else if (x < 9) {
-			x = x - 2;
-			sprintf((char *)hpil_controllerDataBuf.data, "LT %u,%u;", to_int(x), to_int(y));
+		else if ((reg_x->type == TYPE_STRING) || (reg_y->type == TYPE_STRING)) {
+			error = ERR_ALPHA_DATA_IS_INVALID;
 		}
 		else {
-			return ERR_NONE;
+			error = ERR_INVALID_TYPE;
 		}
-		ILCMD_AAU;
-		hpil_step = 0;
-		hpil_completion = hpil_plotter_cmd_completion;
-		mode_interruptible = hpil_worker;
-		err = ERR_INTERRUPTIBLE;
 	}
-	else if ((reg_x->type == TYPE_STRING) || (reg_y->type == TYPE_STRING)) {
-		err = ERR_ALPHA_DATA_IS_INVALID;
-	}
-	else {
-		err = ERR_INVALID_TYPE;
-	}
-	return err;
+	return error;
 }
 
 int docmd_lxaxis(arg_struct *arg) {
 	int err;
-	err = hpil_plotter_check();
-	if (err != ERR_NONE) {
+	err = hpil_plotter_check();;
+	if (err == ERR_OVERLAPED_OPERATION) {
+		mode_interruptible = defrd_lxaxis;
+		return ERR_INTERRUPTIBLE;
+	}
+	else if (err != ERR_NONE) {
 		return err;
 	}
-	if ((reg_x->type == TYPE_REAL) && (reg_y->type == TYPE_REAL) && (reg_z->type == TYPE_REAL) && (reg_t->type == TYPE_REAL)) {
-		if ((((vartype_real *)reg_t)->x <= ((vartype_real *)reg_z)->x) || (((vartype_real *)reg_y)->x == 0)) {
-			return ERR_PLOTTER_RANGE_ERR;
+	return defrd_lxaxis(ERR_NONE);
+}
+
+static int defrd_lxaxis(int error) {
+	if (error == ERR_NONE) {
+		error = ERR_INTERRUPTIBLE;
+		if ((reg_x->type == TYPE_REAL) && (reg_y->type == TYPE_REAL) && (reg_z->type == TYPE_REAL) && (reg_t->type == TYPE_REAL)) {
+			if ((((vartype_real *)reg_t)->x <= ((vartype_real *)reg_z)->x) || (((vartype_real *)reg_y)->x == 0)) {
+				return ERR_PLOTTER_RANGE_ERR;
+			}
+			ILCMD_AAU;
+			hpil_step = 0;
+			plotterData.ioBuf.plotting_status = (plotterData.ioBuf.plotting_status & 0x000f) | (PLOTTER_FLAG_AXIS_LABEL | PLOTTER_FLAG_AXIS_TICK);
+			hpil_completion = hpil_plotter_axis_completion;
+			mode_interruptible = hpil_worker;
+			mode_stoppable = true;
 		}
-		ILCMD_AAU;
-		hpil_step = 0;
-		plotterData.ioBuf.plotting_status = (plotterData.ioBuf.plotting_status & 0x000f) | (PLOTTER_FLAG_AXIS_LABEL | PLOTTER_FLAG_AXIS_TICK);
-		hpil_completion = hpil_plotter_axis_completion;
-		mode_interruptible = hpil_worker;
-		err = ERR_INTERRUPTIBLE;
+		else if ((reg_x->type == TYPE_STRING) || (reg_y->type == TYPE_STRING) || (reg_z->type == TYPE_STRING) || (reg_t->type == TYPE_STRING)) {
+			error = ERR_ALPHA_DATA_IS_INVALID;
+		}
+		else {
+			error = ERR_INVALID_TYPE;
+		}
 	}
-	else if ((reg_x->type == TYPE_STRING) || (reg_y->type == TYPE_STRING) || (reg_z->type == TYPE_STRING) || (reg_t->type == TYPE_STRING)) {
-		return ERR_ALPHA_DATA_IS_INVALID;
-	}
-	else {
-		err = ERR_INVALID_TYPE;
-	}
-	return err;
+	return error;
 }
 
 int docmd_lyaxis(arg_struct *arg) {
 	int err;
-	err = hpil_plotter_check();
-	if (err != ERR_NONE) {
+	err = hpil_plotter_check();;
+	if (err == ERR_OVERLAPED_OPERATION) {
+		mode_interruptible = defrd_lyaxis;
+		return ERR_INTERRUPTIBLE;
+	}
+	else if (err != ERR_NONE) {
 		return err;
 	}
-	if ((reg_x->type == TYPE_REAL) && (reg_y->type == TYPE_REAL) && (reg_z->type == TYPE_REAL) && (reg_t->type == TYPE_REAL)) {
-		if ((((vartype_real *)reg_t)->x <= ((vartype_real *)reg_z)->x) || (((vartype_real *)reg_y)->x == 0)) {
-			return ERR_PLOTTER_RANGE_ERR;
+	return defrd_lyaxis(ERR_NONE);
+}
+
+static int defrd_lyaxis(int error) {
+	if (error == ERR_NONE) {
+		error = ERR_INTERRUPTIBLE;
+		if ((reg_x->type == TYPE_REAL) && (reg_y->type == TYPE_REAL) && (reg_z->type == TYPE_REAL) && (reg_t->type == TYPE_REAL)) {
+			if ((((vartype_real *)reg_t)->x <= ((vartype_real *)reg_z)->x) || (((vartype_real *)reg_y)->x == 0)) {
+				return ERR_PLOTTER_RANGE_ERR;
+			}
+			ILCMD_AAU;
+			hpil_step = 0;
+			plotterData.ioBuf.plotting_status = (plotterData.ioBuf.plotting_status & 0x000f) | (PLOTTER_FLAG_AXIS_Y | PLOTTER_FLAG_AXIS_LABEL | PLOTTER_FLAG_AXIS_TICK);
+			hpil_completion = hpil_plotter_axis_completion;
+			mode_interruptible = hpil_worker;
+			mode_stoppable = true;
 		}
-		ILCMD_AAU;
-		hpil_step = 0;
-		plotterData.ioBuf.plotting_status = (plotterData.ioBuf.plotting_status & 0x000f) | (PLOTTER_FLAG_AXIS_Y | PLOTTER_FLAG_AXIS_LABEL | PLOTTER_FLAG_AXIS_TICK);
-		hpil_completion = hpil_plotter_axis_completion;
-		mode_interruptible = hpil_worker;
-		err = ERR_INTERRUPTIBLE;
+		else if ((reg_x->type == TYPE_STRING) || (reg_y->type == TYPE_STRING) || (reg_z->type == TYPE_STRING) || (reg_t->type == TYPE_STRING)) {
+			error = ERR_ALPHA_DATA_IS_INVALID;
+		}
+		else {
+			error = ERR_INVALID_TYPE;
+		}
 	}
-	else if ((reg_x->type == TYPE_STRING) || (reg_y->type == TYPE_STRING) || (reg_z->type == TYPE_STRING) || (reg_t->type == TYPE_STRING)) {
-		return ERR_ALPHA_DATA_IS_INVALID;
-	}
-	else {
-		err = ERR_INVALID_TYPE;
-	}
-	return err;
+	return error;
 }
 
 int docmd_move(arg_struct *arg) {
 	int err;
-	err = hpil_plotter_check();
-	if (err != ERR_NONE) {
+	err = hpil_plotter_check();;
+	if (err == ERR_OVERLAPED_OPERATION) {
+		mode_interruptible = defrd_move;
+		return ERR_INTERRUPTIBLE;
+	}
+	else if (err != ERR_NONE) {
 		return err;
 	}
-	if ((reg_x->type == TYPE_REAL) && (reg_y->type == TYPE_REAL)) {
-		plotterData.ioBuf.plotting_status = (plotterData.ioBuf.plotting_status & 0x000f) | PLOTTER_FLAG_SET_PEN_STATUS;
-		ILCMD_AAU;
-		hpil_step = 0;
-		hpil_completion = hpil_plotter_plot_generic_completion;
-		mode_interruptible = hpil_worker;
-		err = ERR_INTERRUPTIBLE;
+	return defrd_move(ERR_NONE);
+}
+
+static int defrd_move(int error) {
+	if (error == ERR_NONE) {
+		error = ERR_INTERRUPTIBLE;
+		if ((reg_x->type == TYPE_REAL) && (reg_y->type == TYPE_REAL)) {
+			plotterData.ioBuf.plotting_status = (plotterData.ioBuf.plotting_status & 0x000f) | PLOTTER_FLAG_SET_PEN_STATUS;
+			ILCMD_AAU;
+			hpil_step = 0;
+			hpil_completion = hpil_plotter_plot_generic_completion;
+			mode_interruptible = hpil_worker;
+			mode_stoppable = true;
+		}
+		else if ((reg_x->type == TYPE_STRING) || (reg_y->type == TYPE_STRING)) {
+			error = ERR_ALPHA_DATA_IS_INVALID;
+		}
+		else {
+			error = ERR_INVALID_TYPE;
+		}
 	}
-	else if ((reg_x->type == TYPE_STRING) || (reg_y->type == TYPE_STRING)) {
-		err = ERR_ALPHA_DATA_IS_INVALID;
-	}
-	else {
-		err = ERR_INVALID_TYPE;
-	}
-	return err;
+	return error;
 }
 
 int docmd_pen(arg_struct *arg) {
 	int err;
-	phloat x,y;
 	err = hpil_plotter_check();
-	if (err != ERR_NONE) {
+	if (err == ERR_OVERLAPED_OPERATION) {
+		mode_interruptible = defrd_pen;
+		return ERR_INTERRUPTIBLE;
+	}
+	else if (err != ERR_NONE) {
 		return err;
 	}
-	if (reg_x->type == TYPE_REAL) {
-		x = ((vartype_real *) reg_x)->x;
-		x = floor(x);
-		sprintf((char *)hpil_controllerDataBuf.data, "SP %i;", to_int(x));
-		ILCMD_AAU;
-		hpil_step = 0;
-		hpil_completion = hpil_plotter_cmd_completion;
-		mode_interruptible = hpil_worker;
-		err = ERR_INTERRUPTIBLE;
+	return defrd_pen(ERR_NONE);
+}
+
+static int defrd_pen(int error) {
+phloat x;
+	if (error == ERR_NONE) {
+		error = ERR_INTERRUPTIBLE;
+		if (reg_x->type == TYPE_REAL) {
+			x = ((vartype_real *) reg_x)->x;
+			x = floor(x);
+			sprintf((char *)hpil_controllerDataBuf.data, "SP %i;", to_int(x));
+			ILCMD_AAU;
+			hpil_step = 0;
+			hpil_completion = hpil_plotter_cmd_completion;
+			mode_interruptible = hpil_worker;
+			mode_stoppable = true;
+		}
+		else if (reg_x->type == TYPE_STRING) {
+			error = ERR_ALPHA_DATA_IS_INVALID;
+		}
+		else {
+			error = ERR_INVALID_TYPE;
+		}
 	}
-	else if (reg_x->type == TYPE_STRING) {
-		err = ERR_ALPHA_DATA_IS_INVALID;
-	}
-	else {
-		err = ERR_INVALID_TYPE;
-	}
-	return err;
+	return error;
 }
 
 int docmd_pendn(arg_struct *arg) {
 	int err;
-	err = hpil_plotter_check();
-	if (err != ERR_NONE) {
+	err = hpil_plotter_check();;
+	if (err == ERR_OVERLAPED_OPERATION) {
+		mode_interruptible = defrd_pendn;
+		return ERR_INTERRUPTIBLE;
+	}
+	else if (err != ERR_NONE) {
 		return err;
 	}
-	plotterData.ioBuf.plotting_status |= PLOTTER_STATUS_PEN_DOWN;
-	sprintf((char *)hpil_controllerDataBuf.data, "PD;");
-	ILCMD_AAU;
-	hpil_step = 0;
-	hpil_completion = hpil_plotter_cmd_completion;
-	mode_interruptible = hpil_worker;
-	return ERR_INTERRUPTIBLE;
+	return defrd_pendn(ERR_NONE);
+}
+
+static int defrd_pendn(int error) {
+	if (error == ERR_NONE) {
+		error = ERR_INTERRUPTIBLE;
+		plotterData.ioBuf.plotting_status |= PLOTTER_STATUS_PEN_DOWN;
+		sprintf((char *)hpil_controllerDataBuf.data, "PD;");
+		ILCMD_AAU;
+		hpil_step = 0;
+		hpil_completion = hpil_plotter_cmd_completion;
+		mode_interruptible = hpil_worker;
+		mode_stoppable = true;
+	}
+	return error;
 }
 
 int docmd_penup(arg_struct *arg) {
 	int err;
-	err = hpil_plotter_check();
-	if (err != ERR_NONE) {
+	err = hpil_plotter_check();;
+	if (err == ERR_OVERLAPED_OPERATION) {
+		mode_interruptible = defrd_penup;
+		return ERR_INTERRUPTIBLE;
+	}
+	else if (err != ERR_NONE) {
 		return err;
 	}
-	plotterData.ioBuf.plotting_status &= ~PLOTTER_STATUS_PEN_DOWN;
-	sprintf((char *)hpil_controllerDataBuf.data, "PU;");
-	ILCMD_AAU;
-	hpil_step = 0;
-	hpil_completion = hpil_plotter_cmd_completion;
-	mode_interruptible = hpil_worker;
-	return ERR_INTERRUPTIBLE;
+	return defrd_penup(ERR_NONE);
+}
+
+static int defrd_penup(int error) {
+	if (error == ERR_NONE) {
+		error = ERR_INTERRUPTIBLE;
+		plotterData.ioBuf.plotting_status &= ~PLOTTER_STATUS_PEN_DOWN;
+		sprintf((char *)hpil_controllerDataBuf.data, "PU;");
+		ILCMD_AAU;
+		hpil_step = 0;
+		hpil_completion = hpil_plotter_cmd_completion;
+		mode_interruptible = hpil_worker;
+		mode_stoppable = true;
+	}
+	return error;
 }
 
 int docmd_pinit(arg_struct *arg) {
 	int err;
-	err = hpil_check();
-	if (err != ERR_NONE) {
+	err = hpil_check();;
+	if (err == ERR_OVERLAPED_OPERATION) {
+		mode_interruptible = defrd_pinit;
+		return ERR_INTERRUPTIBLE;
+	}
+	else if (err != ERR_NONE) {
 		return err;
 	}
-	ILCMD_AAU;
-	hpil_step = 4;
-	hpil_completion = hpil_plotter_limit_pinit_completion;
-	mode_interruptible = hpil_worker;
-	return ERR_INTERRUPTIBLE;
+	return defrd_pinit(ERR_NONE);
+}
+
+static int defrd_pinit(int error) {
+	if (error == ERR_NONE) {
+		error = ERR_INTERRUPTIBLE;
+		ILCMD_AAU;
+		hpil_step = 4;
+		hpil_completion = hpil_plotter_limit_pinit_completion;
+		mode_interruptible = hpil_worker;
+		mode_stoppable = true;
+	}
+	return error;
 }
 
 int docmd_plot(arg_struct *arg) {
 	int err;
-	err = hpil_plotter_check();
-	if (err != ERR_NONE) {
+	err = hpil_plotter_check();;
+	if (err == ERR_OVERLAPED_OPERATION) {
+		mode_interruptible = defrd_plot;
+		return ERR_INTERRUPTIBLE;
+	}
+	else if (err != ERR_NONE) {
 		return err;
 	}
-	if ((reg_x->type == TYPE_REAL) && (reg_y->type == TYPE_REAL)) {
-		plotterData.ioBuf.plotting_status = (plotterData.ioBuf.plotting_status & 0x000f) | PLOTTER_FLAG_SET_PEN_DOWN;
-		ILCMD_AAU;
-		hpil_step = 0;
-		hpil_completion = hpil_plotter_plot_generic_completion;
-		mode_interruptible = hpil_worker;
-		err = ERR_INTERRUPTIBLE;
+	return defrd_plot(ERR_NONE);
+}
+
+static int defrd_plot(int error) {
+	if (error == ERR_NONE) {
+		error = ERR_INTERRUPTIBLE;
+		if ((reg_x->type == TYPE_REAL) && (reg_y->type == TYPE_REAL)) {
+			plotterData.ioBuf.plotting_status = (plotterData.ioBuf.plotting_status & 0x000f) | PLOTTER_FLAG_SET_PEN_DOWN;
+			ILCMD_AAU;
+			hpil_step = 0;
+			hpil_completion = hpil_plotter_plot_generic_completion;
+			mode_interruptible = hpil_worker;
+			mode_stoppable = true;
+		}
+		else if ((reg_x->type == TYPE_STRING) || (reg_y->type == TYPE_STRING)) {
+			error = ERR_ALPHA_DATA_IS_INVALID;
+		}
+		else {
+			error = ERR_INVALID_TYPE;
+		}
 	}
-	else if ((reg_x->type == TYPE_STRING) || (reg_y->type == TYPE_STRING)) {
-		return ERR_ALPHA_DATA_IS_INVALID;
-	}
-	else {
-		err = ERR_INVALID_TYPE;
-	}
-	return err;
+	return error;
 }
 
 int docmd_plregx(arg_struct *arg) {
 	int err;
-	phloat x;
-	int regSize;
-	err = hpil_plotter_check();
-	if (err != ERR_NONE) {
+	err = hpil_plotter_check();;
+	if (err == ERR_OVERLAPED_OPERATION) {
+		mode_interruptible = defrd_plregx;
+		return ERR_INTERRUPTIBLE;
+	}
+	else if (err != ERR_NONE) {
 		return err;
 	}
-	plotterData.ioBuf.plotting_status = (plotterData.ioBuf.plotting_status & 0x000f) | PLOTTER_FLAG_PLOT_REG;
-	if (reg_x->type == TYPE_REAL) {			// use regs
-		plotterData.plReg = recall_var("REGS", 4);
-		if (plotterData.plReg == NULL) {
-			return ERR_NONEXISTENT;
-		}
-		if (plotterData.plReg->type != TYPE_REALMATRIX) {
-			return ERR_INVALID_TYPE;
-		}
-		if (((vartype_realmatrix *)plotterData.plReg)->columns != 1) {
-			return ERR_DIMENSION_ERROR;
-		}
-		regSize = ((vartype_realmatrix*)plotterData.plReg)->rows - 1;
-		x = ((vartype_real *)reg_x)->x;
-		if (x < 0) {
-	        x = -x;
-		}
-	    plotterData.plRegFrom = to_int(x);
-	    x = (x - plotterData.plRegFrom) * 1000;
-	    // cf generic_loop_helper for the 0.0005 trick.
-	    #ifndef BCD_MATH
+	return defrd_plregx(ERR_NONE);
+}
+
+static int defrd_plregx(int error) {
+	phloat x;
+	int regSize;
+	if (error == ERR_NONE) {
+		error = ERR_INTERRUPTIBLE;
+		plotterData.ioBuf.plotting_status = (plotterData.ioBuf.plotting_status & 0x000f) | PLOTTER_FLAG_PLOT_REG;
+		if (reg_x->type == TYPE_REAL) {			// use regs
+			plotterData.plReg = recall_var("REGS", 4);
+			if (plotterData.plReg == NULL) {
+				return ERR_NONEXISTENT;
+			}
+			if (plotterData.plReg->type != TYPE_REALMATRIX) {
+				return ERR_INVALID_TYPE;
+			}
+			if (((vartype_realmatrix *)plotterData.plReg)->columns != 1) {
+				return ERR_DIMENSION_ERROR;
+			}
+			regSize = ((vartype_realmatrix*)plotterData.plReg)->rows - 1;
+			x = ((vartype_real *)reg_x)->x;
+			if (x < 0) {
+		        x = -x;
+			}
+			plotterData.plRegFrom = to_int(x);
+			x = (x - plotterData.plRegFrom) * 1000;
+			// cf generic_loop_helper for the 0.0005 trick.
+			#ifndef BCD_MATH
 			x = x + 0.0005;
-		#endif
-		plotterData.plRegTo = to_int(x);
-		if ((plotterData.plRegFrom > regSize) || (plotterData.plRegTo > regSize) || (plotterData.plRegTo < plotterData.plRegFrom)) {
-			return ERR_OUT_OF_RANGE;
+			#endif
+			plotterData.plRegTo = to_int(x);
+			if ((plotterData.plRegFrom > regSize) || (plotterData.plRegTo > regSize) || (plotterData.plRegTo < plotterData.plRegFrom)) {
+				return ERR_OUT_OF_RANGE;
+			}
 		}
-	}
-	else if (reg_x->type == TYPE_STRING) {	// use matrix, real (x,y if vector else colums 1 and 2 for x,y) or complex. 
-		plotterData.plReg = recall_var(((vartype_string *)reg_x)->text, ((vartype_string *)reg_x)->length);
-		if (plotterData.plReg == NULL) {
-			return ERR_NONEXISTENT;
-		}
-		if (plotterData.plReg->type == TYPE_REALMATRIX) {
-			plotterData.plRegFrom = 0;
-			if (((vartype_realmatrix *)plotterData.plReg)->rows == 1) {
-				plotterData.plRegTo = ((vartype_realmatrix *)plotterData.plReg)->rows - 1;
+		else if (reg_x->type == TYPE_STRING) {	// use matrix, real (x,y if vector else colums 1 and 2 for x,y) or complex. 
+			plotterData.plReg = recall_var(((vartype_string *)reg_x)->text, ((vartype_string *)reg_x)->length);
+			if (plotterData.plReg == NULL) {
+				return ERR_NONEXISTENT;
+			}
+			if (plotterData.plReg->type == TYPE_REALMATRIX) {
+				plotterData.plRegFrom = 0;
+				if (((vartype_realmatrix *)plotterData.plReg)->rows == 1) {
+					plotterData.plRegTo = ((vartype_realmatrix *)plotterData.plReg)->rows - 1;
+				}
+				else {
+					plotterData.plRegTo = (((vartype_realmatrix *)plotterData.plReg)->rows - 1) * 2;
+				}
+			}
+			else if (plotterData.plReg->type == TYPE_COMPLEXMATRIX) {
+				plotterData.plRegFrom = 0;
+				plotterData.plRegTo = (((vartype_complexmatrix *)plotterData.plReg)->rows - 1) * 2;
 			}
 			else {
-				plotterData.plRegTo = (((vartype_realmatrix *)plotterData.plReg)->rows - 1) * 2;
+				return ERR_INVALID_TYPE;
 			}
 		}
-		else if (plotterData.plReg->type == TYPE_COMPLEXMATRIX) {
-			plotterData.plRegFrom = 0;
-			plotterData.plRegTo = (((vartype_complexmatrix *)plotterData.plReg)->rows - 1) * 2;
-		}
 		else {
-			return ERR_INVALID_TYPE;
+			return  ERR_INVALID_TYPE;
 		}
+		ILCMD_AAU;
+		hpil_step = 0;
+		hpil_completion = hpil_plotter_plot_generic_completion;
+		mode_interruptible = hpil_worker;
+		mode_stoppable = true;
 	}
-	else {
-		return  ERR_INVALID_TYPE;
-	}
-	ILCMD_AAU;
-	hpil_step = 0;
-	hpil_completion = hpil_plotter_plot_generic_completion;
-	mode_interruptible = hpil_worker;
-	return ERR_INTERRUPTIBLE;
+	return error;
 }
 
 int docmd_ratio(arg_struct *arg) {
 	int err;
 	phloat dx, dy, ratio;
 	vartype *v;
-	err = hpil_plotter_check();
-	if (err != ERR_NONE) {
+	err = hpil_plotter_check();;
+	if (err == ERR_OVERLAPED_OPERATION) {
+		err = ERR_NONE;
+	}
+	else if (err != ERR_NONE) {
 		return err;
 	}
 	dx = P2_x - P1_x;
@@ -892,241 +1212,349 @@ int docmd_ratio(arg_struct *arg) {
 			ratio = -ratio;
 		}
 		ratio = floor(ratio * 10000) / 10000;
+		v = new_real(ratio);
+		if (v == NULL) {
+			err = ERR_INSUFFICIENT_MEMORY;
+		}
+		else {
+			recall_result(v);
+		}
 	}
-	v = new_real(ratio);
-	if (v == NULL) {
-	    return ERR_INSUFFICIENT_MEMORY;
-	}
-	recall_result(v);
-	return ERR_NONE;
+	return err;
 }
 
 int docmd_rplot(arg_struct *arg) {
 	int err;
-	err = hpil_plotter_check();
-	if (err != ERR_NONE) {
+	err = hpil_plotter_check();;
+	if (err == ERR_OVERLAPED_OPERATION) {
+		mode_interruptible = defrd_rplot;
+		return ERR_INTERRUPTIBLE;
+	}
+	else if (err != ERR_NONE) {
 		return err;
 	}
-	if ((reg_x->type == TYPE_REAL) && (reg_y->type == TYPE_REAL)) {
-		plotterData.ioBuf.plotting_status = (plotterData.ioBuf.plotting_status & 0x000f) | (PLOTTER_FLAG_SET_PEN_DOWN | PLOTTER_FLAG_INCREMENT | PLOTTER_FLAG_RELATIVE);
-		ILCMD_AAU;
-		hpil_step = 0;
-		hpil_completion = hpil_plotter_plot_generic_completion;
-		mode_interruptible = hpil_worker;
-		err = ERR_INTERRUPTIBLE;
+	return defrd_rplot(ERR_NONE);
+}
+
+static int defrd_rplot(int error) {
+	if (error == ERR_NONE) {
+		error = ERR_INTERRUPTIBLE;
+		if ((reg_x->type == TYPE_REAL) && (reg_y->type == TYPE_REAL)) {
+			plotterData.ioBuf.plotting_status = (plotterData.ioBuf.plotting_status & 0x000f) | (PLOTTER_FLAG_SET_PEN_DOWN | PLOTTER_FLAG_INCREMENT | PLOTTER_FLAG_RELATIVE);
+			ILCMD_AAU;
+			hpil_step = 0;
+			hpil_completion = hpil_plotter_plot_generic_completion;
+			mode_interruptible = hpil_worker;
+			mode_stoppable = true;
+		}
+		else if ((reg_x->type == TYPE_STRING) || (reg_y->type == TYPE_STRING)) {
+			error = ERR_ALPHA_DATA_IS_INVALID;
+		}
+		else {
+			error = ERR_INVALID_TYPE;
+		}
 	}
-	else if ((reg_x->type == TYPE_STRING) || (reg_y->type == TYPE_STRING)) {
-		return ERR_ALPHA_DATA_IS_INVALID;
-	}
-	else {
-		err = ERR_INVALID_TYPE;
-	}
-	return err;
+	return error;
 }
 
 int docmd_scale(arg_struct *arg) {
 	int err;
 	phloat dx, dy;
-	err = hpil_plotter_check();
-	if (err != ERR_NONE) {
+	err = hpil_plotter_check();;
+	if (err == ERR_OVERLAPED_OPERATION) {
+		err = ERR_NONE;
+	}
+	else if (err != ERR_NONE) {
 		return err;
 	}
 	if ((reg_x->type == TYPE_REAL) && (reg_y->type == TYPE_REAL) && (reg_z->type == TYPE_REAL) && (reg_t->type == TYPE_REAL)) {
 		dx = ((vartype_real *)reg_z)->x - ((vartype_real *)reg_t)->x;
 		dy = ((vartype_real *)reg_x)->x - ((vartype_real *)reg_y)->x;
 		if ((dx == 0) || (dy == 0)) {
-			return ERR_INVALID_DATA;
+			err = ERR_INVALID_DATA;
 		}
-		Factor1_x_prime = (x2 - x1) / dx;
-		Factor2_x_prime	= x1 - ((vartype_real *)reg_t)->x * Factor1_x_prime;
-		Factor1_y_prime	= (y2 - y1) / dy;
-		Factor2_y_prime	= y1 - ((vartype_real *)reg_y)->x * Factor1_y_prime;
-		err = ERR_NONE;
-	}
+		else {
+			Factor1_x_prime = (x2 - x1) / dx;
+			Factor2_x_prime	= x1 - ((vartype_real *)reg_t)->x * Factor1_x_prime;
+			Factor1_y_prime	= (y2 - y1) / dy;
+			Factor2_y_prime	= y1 - ((vartype_real *)reg_y)->x * Factor1_y_prime;
+			}
+		}
 	else if ((reg_x->type == TYPE_STRING) || (reg_y->type == TYPE_STRING) || (reg_z->type == TYPE_STRING) || (reg_t->type == TYPE_STRING)) {
-		return ERR_ALPHA_DATA_IS_INVALID;
+		err = ERR_ALPHA_DATA_IS_INVALID;
 	}
 	else {
 		err = ERR_INVALID_TYPE;
 	}
-	return ERR_NONE;
+	return err;
 }
 
 int docmd_setgu(arg_struct *arg) {
 	int err;
-	err = hpil_plotter_check();
-	if (err != ERR_NONE) {
+	err = hpil_plotter_check();;
+	if (err == ERR_OVERLAPED_OPERATION) {
+		mode_interruptible = defrd_setgu;
+		return ERR_INTERRUPTIBLE;
+	}
+	else if (err != ERR_NONE) {
 		return err;
 	}
-	plotterData.ioBuf.plotting_status &= ~PLOTTER_STATUS_MODE_UU;
-	sprintf((char *)hpil_controllerDataBuf.data, "IW %u,%u,%u,%u;", to_int(P1_x), to_int(P1_y), to_int(P2_x), to_int(P2_y));
-	ILCMD_AAU;
-	hpil_step = 0;
-	hpil_completion = hpil_plotter_cmd_completion;
-	mode_interruptible = hpil_worker;
-	return ERR_INTERRUPTIBLE;
+	return defrd_setgu(ERR_NONE);
 }
 
-int docmd_setuu(arg_struct *arg) {
-	int err;
-	err = hpil_plotter_check();
-	if (err != ERR_NONE) {
-		return err;
-	}
-	plotterData.ioBuf.plotting_status |= PLOTTER_STATUS_MODE_UU;
-	sprintf((char *)hpil_controllerDataBuf.data, "IW %u,%u,%u,%u;", to_int(x1), to_int(y1), to_int(x2), to_int(y2));
-	ILCMD_AAU;
-	hpil_step = 0;
-	hpil_completion = hpil_plotter_cmd_completion;
-	mode_interruptible = hpil_worker;
-	return ERR_INTERRUPTIBLE;
-}
-
-int docmd_ticlen(arg_struct *arg) {
-	int err;
-	phloat x;
-	err = hpil_plotter_check();
-	if (err != ERR_NONE) {
-		return err;
-	}
-	if (reg_x->type == TYPE_REAL) {
-		x = ((vartype_real *) reg_x)->x;
-		// get absolute value
-		if (x < 0) {
-			x = -x;
-		}
-		sprintf((char *)hpil_controllerDataBuf.data, "TL %u,%u;", to_int(x), to_int(x));
+static int defrd_setgu(int error) {
+	if (error == ERR_NONE) {
+		error = ERR_INTERRUPTIBLE;
+		plotterData.ioBuf.plotting_status &= ~PLOTTER_STATUS_MODE_UU;
+		sprintf((char *)hpil_controllerDataBuf.data, "IW %u,%u,%u,%u;", to_int(P1_x), to_int(P1_y), to_int(P2_x), to_int(P2_y));
 		ILCMD_AAU;
 		hpil_step = 0;
 		hpil_completion = hpil_plotter_cmd_completion;
 		mode_interruptible = hpil_worker;
-		err = ERR_INTERRUPTIBLE;
+		mode_stoppable = true;
 	}
-	else if (reg_x->type == TYPE_STRING) {
-		return ERR_ALPHA_DATA_IS_INVALID;
+	return error;
+}
+
+int docmd_setuu(arg_struct *arg) {
+	int err;
+	err = hpil_plotter_check();;
+	if (err == ERR_OVERLAPED_OPERATION) {
+		mode_interruptible = defrd_setuu;
+		return ERR_INTERRUPTIBLE;
 	}
-	else {
-		err = ERR_INVALID_TYPE;
+	else if (err != ERR_NONE) {
+		return err;
 	}
-return err;
+	return defrd_setuu(ERR_NONE);
+}
+
+static int defrd_setuu(int error) {
+	if (error == ERR_NONE) {
+		error = ERR_INTERRUPTIBLE;
+		plotterData.ioBuf.plotting_status |= PLOTTER_STATUS_MODE_UU;
+		sprintf((char *)hpil_controllerDataBuf.data, "IW %u,%u,%u,%u;", to_int(x1), to_int(y1), to_int(x2), to_int(y2));
+		ILCMD_AAU;
+		hpil_step = 0;
+		hpil_completion = hpil_plotter_cmd_completion;
+		mode_interruptible = hpil_worker;
+		mode_stoppable = true;
+	}
+	return error;
+}
+
+int docmd_ticlen(arg_struct *arg) {
+	int err;
+	err = hpil_plotter_check();;
+	if (err == ERR_OVERLAPED_OPERATION) {
+		mode_interruptible = defrd_ticlen;
+		return ERR_INTERRUPTIBLE;
+	}
+	else if (err != ERR_NONE) {
+		return err;
+	}
+	return defrd_ticlen(ERR_NONE);
+}
+
+static int defrd_ticlen(int error) {
+	phloat x;
+	if (error == ERR_NONE) {
+		error = ERR_INTERRUPTIBLE;
+		if (reg_x->type == TYPE_REAL) {
+			x = ((vartype_real *) reg_x)->x;
+			// get absolute value
+			if (x < 0) {
+				x = -x;
+			}
+			sprintf((char *)hpil_controllerDataBuf.data, "TL %u,%u;", to_int(x), to_int(x));
+			ILCMD_AAU;
+			hpil_step = 0;
+			hpil_completion = hpil_plotter_cmd_completion;
+			mode_interruptible = hpil_worker;
+			mode_stoppable = true;
+		}
+		else if (reg_x->type == TYPE_STRING) {
+			error = ERR_ALPHA_DATA_IS_INVALID;
+		}
+		else {
+			error = ERR_INVALID_TYPE;
+		}
+	}
+	return error;
 }
 
 int docmd_unclip(arg_struct *arg) {
 	int err;
-	phloat x;
-	err = hpil_plotter_check();
-	if (err != ERR_NONE) {
+	err = hpil_plotter_check();;
+	if (err == ERR_OVERLAPED_OPERATION) {
+		mode_interruptible = defrd_unclip;
+		return ERR_INTERRUPTIBLE;
+	}
+	else if (err != ERR_NONE) {
 		return err;
 	}
-	x1 = P1_x;
-	x2 = P2_x;
-	y1 = P1_y;
-	y2 = P2_y;
-	sprintf((char *)hpil_controllerDataBuf.data, "IW %u,%u,%u,%u;",
-		to_int(x1), to_int(y1), to_int(x2), to_int(y2));
-	ILCMD_AAU;
-	hpil_step = 0;
-	hpil_completion = hpil_plotter_cmd_completion;
-	mode_interruptible = hpil_worker;
-	return ERR_INTERRUPTIBLE;
+	return defrd_unclip(ERR_NONE);
+}
+
+static int defrd_unclip(int error) {
+	phloat x;
+	if (error == ERR_NONE) {
+		error = ERR_INTERRUPTIBLE;
+		x1 = P1_x;
+		x2 = P2_x;
+		y1 = P1_y;
+		y2 = P2_y;
+		sprintf((char *)hpil_controllerDataBuf.data, "IW %u,%u,%u,%u;",
+			to_int(x1), to_int(y1), to_int(x2), to_int(y2));
+		ILCMD_AAU;
+		hpil_step = 0;
+		hpil_completion = hpil_plotter_cmd_completion;
+		mode_interruptible = hpil_worker;
+		mode_stoppable = true;
+	}
+	return error;
 }
 
 int docmd_xaxis(arg_struct *arg) {
 	int err;
-	err = hpil_plotter_check();
-	if (err != ERR_NONE) {
+	err = hpil_plotter_check();;
+	if (err == ERR_OVERLAPED_OPERATION) {
+		mode_interruptible = defrd_xaxis;
+		return ERR_INTERRUPTIBLE;
+	}
+	else if (err != ERR_NONE) {
 		return err;
 	}
-	if (reg_x->type == TYPE_REAL) {
-		ILCMD_AAU;
-		hpil_step = 0;
-		plotterData.ioBuf.plotting_status = (plotterData.ioBuf.plotting_status & 0x000f) | PLOTTER_FLAG_PLOT_AXIS;
-		hpil_completion = hpil_plotter_plot_generic_completion;
-		mode_interruptible = hpil_worker;
-		err = ERR_INTERRUPTIBLE;
+	return defrd_xaxis(ERR_NONE);
+}
+
+static int defrd_xaxis(int error) {
+	if (error == ERR_NONE) {
+		error = ERR_INTERRUPTIBLE;
+		if (reg_x->type == TYPE_REAL) {
+			ILCMD_AAU;
+			hpil_step = 0;
+			plotterData.ioBuf.plotting_status = (plotterData.ioBuf.plotting_status & 0x000f) | PLOTTER_FLAG_PLOT_AXIS;
+			hpil_completion = hpil_plotter_plot_generic_completion;
+			mode_interruptible = hpil_worker;
+			mode_stoppable = true;
+		}
+		else if (reg_x->type == TYPE_STRING) {
+			error = ERR_ALPHA_DATA_IS_INVALID;
+		}
+		else {
+			error = ERR_INVALID_TYPE;
+		}
 	}
-	else if (reg_x->type == TYPE_STRING) {
-		return ERR_ALPHA_DATA_IS_INVALID;
-	}
-	else {
-		err = ERR_INVALID_TYPE;
-	}
-	return err;
+	return error;
 }
 
 int docmd_xaxiso(arg_struct *arg) {
 	int err;
-	err = hpil_plotter_check();
-	if (err != ERR_NONE) {
+	err = hpil_plotter_check();;
+	if (err == ERR_OVERLAPED_OPERATION) {
+		mode_interruptible = defrd_xaxiso;
+		return ERR_INTERRUPTIBLE;
+	}
+	else if (err != ERR_NONE) {
 		return err;
 	}
-	if ((reg_x->type == TYPE_REAL) && (reg_y->type == TYPE_REAL) && (reg_z->type == TYPE_REAL) && (reg_t->type == TYPE_REAL)) {
-		if ((((vartype_real *)reg_t)->x <= ((vartype_real *)reg_z)->x) || (((vartype_real *)reg_y)->x == 0)) {
-			return ERR_PLOTTER_RANGE_ERR;
+	return defrd_xaxiso(ERR_NONE);
+}
+
+static int defrd_xaxiso(int error) {
+	if (error == ERR_NONE) {
+		error = ERR_INTERRUPTIBLE;
+		if ((reg_x->type == TYPE_REAL) && (reg_y->type == TYPE_REAL) && (reg_z->type == TYPE_REAL) && (reg_t->type == TYPE_REAL)) {
+			if ((((vartype_real *)reg_t)->x <= ((vartype_real *)reg_z)->x) || (((vartype_real *)reg_y)->x == 0)) {
+				return ERR_PLOTTER_RANGE_ERR;
+			}
+			ILCMD_AAU;
+			hpil_step = 0;
+			plotterData.ioBuf.plotting_status = (plotterData.ioBuf.plotting_status & 0x000f) | PLOTTER_FLAG_AXIS_TICK;
+			hpil_completion = hpil_plotter_axis_completion;
+			mode_interruptible = hpil_worker;
+			mode_stoppable = true;
 		}
-		ILCMD_AAU;
-		hpil_step = 0;
-		plotterData.ioBuf.plotting_status = (plotterData.ioBuf.plotting_status & 0x000f) | PLOTTER_FLAG_AXIS_TICK;
-		hpil_completion = hpil_plotter_axis_completion;
-		mode_interruptible = hpil_worker;
-		err = ERR_INTERRUPTIBLE;
+		else if ((reg_x->type == TYPE_STRING) || (reg_y->type == TYPE_STRING) || (reg_z->type == TYPE_STRING) || (reg_t->type == TYPE_STRING)) {
+			error = ERR_ALPHA_DATA_IS_INVALID;
+		}
+		else {
+			error = ERR_INVALID_TYPE;
+		}
 	}
-	else if ((reg_x->type == TYPE_STRING) || (reg_y->type == TYPE_STRING) || (reg_z->type == TYPE_STRING) || (reg_t->type == TYPE_STRING)) {
-		return ERR_ALPHA_DATA_IS_INVALID;
-	}
-	else {
-		err = ERR_INVALID_TYPE;
-	}
-	return err;
+	return error;
 }
 
 int docmd_yaxis(arg_struct *arg) {
 	int err;
-	err = hpil_plotter_check();
-	if (err != ERR_NONE) {
+	err = hpil_plotter_check();;
+	if (err == ERR_OVERLAPED_OPERATION) {
+		mode_interruptible = defrd_yaxis;
+		return ERR_INTERRUPTIBLE;
+	}
+	else if (err != ERR_NONE) {
 		return err;
 	}
-	if (reg_x->type == TYPE_REAL) {
-		ILCMD_AAU;
-		hpil_step = 0;
-		plotterData.ioBuf.plotting_status = (plotterData.ioBuf.plotting_status & 0x000f) | (PLOTTER_FLAG_PLOT_AXIS | PLOTTER_FLAG_AXIS_Y);
-		hpil_completion = hpil_plotter_plot_generic_completion;
-		mode_interruptible = hpil_worker;
-		err = ERR_INTERRUPTIBLE;
+	return defrd_yaxis(ERR_NONE);
+}
+
+static int defrd_yaxis(int error) {
+	if (error == ERR_NONE) {
+		error = ERR_INTERRUPTIBLE;
+		if (reg_x->type == TYPE_REAL) {
+			ILCMD_AAU;
+			hpil_step = 0;
+			plotterData.ioBuf.plotting_status = (plotterData.ioBuf.plotting_status & 0x000f) | (PLOTTER_FLAG_PLOT_AXIS | PLOTTER_FLAG_AXIS_Y);
+			hpil_completion = hpil_plotter_plot_generic_completion;
+			mode_interruptible = hpil_worker;
+			mode_stoppable = true;
+		}
+		else if (reg_x->type == TYPE_STRING) {
+			error = ERR_ALPHA_DATA_IS_INVALID;
+		}
+		else {
+			error = ERR_INVALID_TYPE;
+		}
 	}
-	else if (reg_x->type == TYPE_STRING) {
-		return ERR_ALPHA_DATA_IS_INVALID;
-	}
-	else {
-		err = ERR_INVALID_TYPE;
-	}
-	return err;
+	return error;
 }
 
 int docmd_yaxiso(arg_struct *arg) {
 	int err;
-	err = hpil_plotter_check();
-	if (err != ERR_NONE) {
+	err = hpil_plotter_check();;
+	if (err == ERR_OVERLAPED_OPERATION) {
+		mode_interruptible = defrd_yaxiso;
+		return ERR_INTERRUPTIBLE;
+	}
+	else if (err != ERR_NONE) {
 		return err;
 	}
-	if ((reg_x->type == TYPE_REAL) && (reg_y->type == TYPE_REAL) && (reg_z->type == TYPE_REAL) && (reg_t->type == TYPE_REAL)) {
-		if ((((vartype_real *)reg_t)->x <= ((vartype_real *)reg_z)->x) || (((vartype_real *)reg_y)->x == 0)) {
-			return ERR_PLOTTER_RANGE_ERR;
+	return defrd_yaxiso(ERR_NONE);
+}
+
+static int defrd_yaxiso(int error) {
+	if (error == ERR_NONE) {
+		error = ERR_INTERRUPTIBLE;
+		if ((reg_x->type == TYPE_REAL) && (reg_y->type == TYPE_REAL) && (reg_z->type == TYPE_REAL) && (reg_t->type == TYPE_REAL)) {
+			if ((((vartype_real *)reg_t)->x <= ((vartype_real *)reg_z)->x) || (((vartype_real *)reg_y)->x == 0)) {
+				return ERR_PLOTTER_RANGE_ERR;
+			}
+			ILCMD_AAU;
+			hpil_step = 0;
+			plotterData.ioBuf.plotting_status = (plotterData.ioBuf.plotting_status & 0x000f) | (PLOTTER_FLAG_AXIS_Y | PLOTTER_FLAG_AXIS_TICK);
+			hpil_completion = hpil_plotter_axis_completion;
+			mode_interruptible = hpil_worker;
+			mode_stoppable = true;
 		}
-		ILCMD_AAU;
-		hpil_step = 0;
-		plotterData.ioBuf.plotting_status = (plotterData.ioBuf.plotting_status & 0x000f) | (PLOTTER_FLAG_AXIS_Y | PLOTTER_FLAG_AXIS_TICK);
-		hpil_completion = hpil_plotter_axis_completion;
-		mode_interruptible = hpil_worker;
-		err = ERR_INTERRUPTIBLE;
+		else if ((reg_x->type == TYPE_STRING) || (reg_y->type == TYPE_STRING) || (reg_z->type == TYPE_STRING) || (reg_t->type == TYPE_STRING)) {
+			error = ERR_ALPHA_DATA_IS_INVALID;
+		}
+		else {
+			error = ERR_INVALID_TYPE;
+		}
 	}
-	else if ((reg_x->type == TYPE_STRING) || (reg_y->type == TYPE_STRING) || (reg_z->type == TYPE_STRING) || (reg_t->type == TYPE_STRING)) {
-		return ERR_ALPHA_DATA_IS_INVALID;
-	}
-	else {
-		err = ERR_INVALID_TYPE;
-	}
-	return err;
+	return error;
 }
 
 int docmd_pclbuf(arg_struct *arg) {
@@ -1135,27 +1563,38 @@ int docmd_pclbuf(arg_struct *arg) {
 }
 
 int docmd_pdir(arg_struct *arg) {
+	int err;
 	phloat x;
+	err = hpil_plotter_check();;
+	if (err == ERR_OVERLAPED_OPERATION) {
+		err = ERR_NONE;
+	}
+	else if (err != ERR_NONE) {
+		return err;
+	}
     if (reg_x->type == TYPE_REAL) {
 		x = ((vartype_real *)reg_x)->x;
 		mappable_sin_r(x, &plotterData.ioBuf.pdir_sin);
 		mappable_cos_r(x, &plotterData.ioBuf.pdir_cos);
-    }
+	}
 	else if (reg_x->type == TYPE_STRING) {
-        return ERR_ALPHA_DATA_IS_INVALID;
+		err = ERR_ALPHA_DATA_IS_INVALID;
 	}
 	else {
-		return ERR_INVALID_TYPE;
+		err = ERR_INVALID_TYPE;
 	}
-	return ERR_NONE;
+	return err;
 }
 
 int docmd_prcl(arg_struct *arg) {
 	int err, i;
 	phloat t, u;
 	vartype *v;
-	err = hpil_plotter_check();
-	if (err != ERR_NONE) {
+	err = hpil_plotter_check();;
+	if (err == ERR_OVERLAPED_OPERATION) {
+		err = ERR_NONE;
+	}
+	else if (err != ERR_NONE) {
 		return err;
 	}
 	err = mappable_x_hpil(25,&i);
@@ -1189,17 +1628,18 @@ int docmd_prcl(arg_struct *arg) {
 		// plotting status
 		u = plotterData.ioBuf.plotting_status & 0x000f;
 		t += u / 10000000;
-		v = new_real(t);
 	}
 	else {
 		t = plotterData.ioBuf.BR[i];
 	}
-		v = new_real(t);
+	v = new_real(t);
 	if (v == NULL) {
-	    return ERR_INSUFFICIENT_MEMORY;
+		err = ERR_INSUFFICIENT_MEMORY;
 	}
-	recall_result(v);
-	return ERR_NONE;
+	else {
+		recall_result(v);
+	}
+	return err;
 }
 
 static int hpil_plotter_cmd_completion(int error) {
@@ -1520,8 +1960,8 @@ static int hpil_plotter_axis_completion(int error) {
                                  1, digits, dispmode, flags.f.thousands_separators, 12);
 				}
 				// label in bounds ?
-				if (((plotterData.ioBuf.plotting_status & PLOTTER_FLAG_AXIS_Y) && ((y >= y1) && (y <= y2))) ||
-					(((plotterData.ioBuf.plotting_status & PLOTTER_FLAG_AXIS_Y) == 0) && ((x >= x1) && (x <= x2)))) {
+				if (((plotterData.ioBuf.plotting_status & PLOTTER_FLAG_AXIS_Y) && ((y >= y1) && (y <= (y2+1)))) ||
+					(((plotterData.ioBuf.plotting_status & PLOTTER_FLAG_AXIS_Y) == 0) && ((x >= x1) && (x <= (x2+1))))) {
 					// set label origin
 					if (!(plotterData.ioBuf.plotting_status & PLOTTER_FLAG_AXIS_Y) && (((vartype_real *)reg_y)->x < 0)) {
 						if (reg_alpha_length % 2) {
@@ -1645,7 +2085,7 @@ static int hpil_plotter_limit_pinit_completion(int error) {
 					error = ERR_PLOTTER_ERR;
 				}
 				break;
-			case 4 :		// Pinitit entry point  - Select Plotter
+			case 4 :		// Pinit entry point  - Select Plotter
 				hpilXCore.buf = hpil_controllerAltBuf.data;
 				hpilXCore.bufPtr = 0;
 				hpilXCore.bufSize = 2;
@@ -1972,7 +2412,7 @@ static int hpil_plotterSelect_sub(int error) {
 					if ((hpilXCore.buf[0] & 0xf0) == 0x60) {
 						hpil_settings.plotter = i;
 						ILCMD_nop;
-						error = rtn_il_completion();
+						error = rtn_ilCompletion();
 					}
 					else {
 						error = ERR_NO_PLOTTER;
@@ -2008,7 +2448,7 @@ static int hpil_plotterSend_sub(int error) {
 				break;
 			case 3 :		// LAD > UNL
 				ILCMD_UNL;
-				error = rtn_il_completion();
+				error = rtn_ilCompletion();
 				break;
 			default :
 				error = ERR_NONE;
@@ -2067,7 +2507,7 @@ static int hpil_plotterSendGet_sub(int error) {
 				}
 				else if (!(hpilXCore.statusFlags & ListenTilCrLf)) {
 					ILCMD_NOP;
-					error = rtn_il_completion();
+					error = rtn_ilCompletion();
 				}
 				else {
 					error = ERR_TRANSMIT_ERROR;

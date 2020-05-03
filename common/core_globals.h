@@ -92,6 +92,8 @@ extern FILE *gfile;
 #define ERR_PLOTTER_ERR            55
 #define ERR_PLOTTER_DATA_ERR       56
 #define ERR_PLOTTER_RANGE_ERR      57
+#define ERR_SHADOWRUNNING		   58 
+#define ERR_OVERLAPED_OPERATION	   59 
 
 typedef struct {
     const char *text;
@@ -337,7 +339,7 @@ typedef union {
         char f14;
         char trace_print; /* 'normal_print' ignored if this is set */
         char normal_print;
-        char hpil_ina_err;  /* ina, end condition not found, fill up alpha buf */
+        char hpil_ina_err;  /* ina, end condition not found, fill up alpha buf and disable cr/lf in plotter LABAL command */
         char hpil_ina_eol;  /* ina, crlf condition Ok */
         char f19; char f20;
         char printer_enable;

@@ -63,6 +63,7 @@ protected:
 #define ListenTilEnd		0x00001000		// listen until end frame received
 #define ListenTilCrLf		0x00002000		// listen until cr/lf frames received
 #define ListenTilChar		0x00004000		// listen until char received
+#define pse					0x00010000		// just wait...
 
 // flags for local messages
 #define Local				0x00008000		// local functions (combined with core pseudo messages)
@@ -121,6 +122,7 @@ protected:
 #define M_ltn Local | ltn
 #define M_lun Local | lun
 #define M_tlk Local | tlk
+#define M_pse Local | pse
 
 // commands macros
 // ACG
@@ -175,5 +177,5 @@ protected:
 #define ILCMD_ltn     controllerCommand = M_ltn    ; hpilXCore.statusFlags |= CmdNew
 #define ILCMD_lun     controllerCommand = M_lun    ; hpilXCore.statusFlags |= CmdNew
 #define ILCMD_tlk     controllerCommand = M_tlk    ; hpilXCore.statusFlags |= CmdNew
-
+#define ILCMD_pse     controllerCommand = M_pse    ; hpilXCore.statusFlags |= CmdNew
 #endif

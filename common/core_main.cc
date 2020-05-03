@@ -269,9 +269,14 @@ int core_keydown(int key, int *enqueued, int *repeat) {
             set_shift(false);
         }
         error = mode_interruptible(0);
-        if (error == ERR_INTERRUPTIBLE)
+		if (error == ERR_INTERRUPTIBLE) {
             /* Still not done */
             return 1;
+		}
+		if (error == ERR_SHADOWRUNNING) {
+			/* running state should have been saved by shell */
+			return 0;
+		}
         mode_interruptible = NULL;
         keep_running = handle_error(error);
         if (mode_running) {

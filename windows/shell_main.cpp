@@ -76,7 +76,7 @@ extern const char *skin_bitmap_data[];
 
 // Global Variables:
 HINSTANCE hInst;                                    // current instance
-static HWND hMainWnd;                               // our main window
+HWND hMainWnd;										// our main window
 static HWND hPrintOutWnd;                           // our print-out window
 static TCHAR szMainTitle[MAX_LOADSTRING];           // The main title bar text
 static TCHAR szPrintOutTitle[MAX_LOADSTRING];       // The print-out title bar text
@@ -85,7 +85,7 @@ static TCHAR szPrintOutWindowClass[MAX_LOADSTRING]; // The print-out window clas
 
 static UINT timer = 0;
 static UINT timer3 = 0;
-static int running = 0;
+int running = 0;
 static int enqueued = 0;
 
 static char *printout;
@@ -195,6 +195,7 @@ int APIENTRY WinMain(HINSTANCE hInstance,
 {
     MSG msg;
     HACCEL hAccelTable;
+	int t;
 
     // Initialize global strings
 #ifdef BCD_MATH
@@ -218,9 +219,30 @@ int APIENTRY WinMain(HINSTANCE hInstance,
 
     // Main message loop:
     while (1) {
-        while (running && !PeekMessage(&msg, NULL, 0, 0, PM_NOREMOVE)) {
-            int dummy1, dummy2;
-            running = core_keydown(0, &dummy1, &dummy2);
+        while ((running == 1 || shadowRunning & SHADOWGO) && !PeekMessage(&msg, NULL, 0, 0, PM_NOREMOVE)) {
+			if (shadowRunning & SHADOWRUNALONE) {
+				if (shadowProcess != NULL) {
+				//shell_log("Running Shadow");
+					t = shadowProcess();
+					if (t == ERR_SHADOWRUNNING) {
+						shadowRunning &= ~SHADOWGO;
+					}
+					else if (t != ERR_INTERRUPTIBLE) {
+						shadowRunning &= ~(SHADOWRUNALONE | SHADOWGO);
+						if (shadowRunning & SHADOWRUNONCE) {
+							// restore running state and reset runonce
+							shell_log("from Shadow to Normal");
+							running = 1;
+							shadowRunning &= ~SHADOWRUNONCE;
+						}
+					}
+				}
+			}
+			else {
+				//shell_log("Running Normal");
+				int dummy1, dummy2;
+				running = core_keydown(0, &dummy1, &dummy2);
+			}
         }
         if (!GetMessage(&msg, NULL, 0, 0)) 
             break;
@@ -230,7 +252,6 @@ int APIENTRY WinMain(HINSTANCE hInstance,
             DispatchMessage(&msg);
         }
     }
-
     Quit();
     return msg.wParam;
 }
@@ -407,6 +428,9 @@ static BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 		}
     }
 
+	open_extension(extensionfilename);
+
+
     RECT r;
 
     skin_load(state.skinName, free42dirname, &r.right, &r.bottom);
@@ -423,8 +447,6 @@ static BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
         return FALSE;
 
     core_init(init_mode, version, core_state_file_name, core_state_file_offset);
-
-	open_extension(extensionfilename);
 
     if (state.mainPlacementValid) {
         // Fix the size, in case the saved settings are not appropriate
@@ -552,6 +574,9 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT message, WPARAM wParam, LPAR
 	}
 #endif
 
+	//char debugme[25];
+	//sprintf(debugme,"Message %04x",message);
+	//shell_log(debugme);
     switch (message) {
         case WM_COMMAND: {
             int wmId    = LOWORD(wParam); 
